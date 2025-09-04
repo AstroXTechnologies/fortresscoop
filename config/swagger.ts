@@ -26,7 +26,6 @@ export const setupSwagger = (app: INestApplication) => {
   };
   const customOptions: SwaggerCustomOptions = {
     useGlobalPrefix: true,
-
     customfavIcon: 'https://fav.farm/🛡️',
     customSiteTitle: 'Fortresscoop API Docs',
   };
