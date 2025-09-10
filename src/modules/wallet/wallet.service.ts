@@ -1,26 +1,57 @@
-import { Injectable } from '@nestjs/common';
-import { CreateWalletDto } from './dto/create-wallet.dto';
-import { UpdateWalletDto } from './dto/update-wallet.dto';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { db } from 'src/main';
+import {
+  CreateWalletDto,
+  UpdateWalletDto,
+} from 'src/modules/wallet/wallet.dto';
+import { Wallet } from 'src/modules/wallet/wallet.model';
 
 @Injectable()
 export class WalletService {
-  create(createWalletDto: CreateWalletDto) {
-    return 'This action adds a new wallet';
+  private collection = 'wallets';
+
+  async create(model: CreateWalletDto) {
+    const id = db.collection(this.collection).doc().id;
+    const wallet: Wallet = {
+      id,
+      userId: model.userId,
+      balance: 0,
+      currency: model.currency || 'NGN',
+      createdAt: new Date(),
+    };
+    return await db.collection(this.collection).doc(id).set(wallet);
   }
 
-  findAll() {
-    return `This action returns all wallet`;
+  async findAll(): Promise<Wallet[]> {
+    const snapshot = await db.collection(this.collection).get();
+    return snapshot.docs.map((doc) => doc.data() as Wallet);
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} wallet`;
+  async findOne(walletId: string): Promise<Wallet> {
+    const doc = await db.collection(this.collection).doc(walletId).get();
+    if (!doc.exists) throw new NotFoundException('Wallet not found');
+    return doc.data() as Wallet;
   }
 
-  update(id: number, updateWalletDto: UpdateWalletDto) {
-    return `This action updates a #${id} wallet`;
+  async findByUserId(userId: string): Promise<Wallet> {
+    const snapshot = await db
+      .collection(this.collection)
+      .where('userId', '==', userId)
+      .get();
+    if (snapshot.empty)
+      throw new NotFoundException('Wallet for user not found');
+    return snapshot.docs[0].data() as Wallet;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} wallet`;
+  async update(id: string, model: UpdateWalletDto): Promise<Wallet> {
+    const docRef = db.collection(this.collection).doc(id);
+    const doc = await docRef.get();
+    if (!doc.exists) throw new NotFoundException('Wallet not found');
+    await docRef.update(model as any);
+    return { ...(doc.data() as Wallet), ...model };
+  }
+
+  async remove(id: string): Promise<void> {
+    await db.collection(this.collection).doc(id).delete();
   }
 }

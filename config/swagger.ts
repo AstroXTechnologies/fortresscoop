@@ -12,17 +12,21 @@ export const setupSwagger = (app: INestApplication) => {
     .setDescription('API for fortresscoop')
     .setVersion('1.0')
     .addTag('v1')
-    .addBearerAuth({
-      type: 'http',
-      scheme: 'bearer',
-      bearerFormat: 'JWT',
-      in: 'header',
-      name: 'Authorization',
-    })
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        in: 'header',
+        name: 'Authorization',
+      },
+      'bearer',
+    )
     .build();
 
   const options: SwaggerDocumentOptions = {
     operationIdFactory: (controllerKey: string, methodKey: string) => methodKey,
+    security: [{ bearer: [] }],
   };
   const customOptions: SwaggerCustomOptions = {
     useGlobalPrefix: true,
@@ -30,8 +34,7 @@ export const setupSwagger = (app: INestApplication) => {
     customSiteTitle: 'Fortresscoop API Docs',
   };
 
-  const documentFactory = () =>
-    SwaggerModule.createDocument(app, config, options);
+  const documentFactory = SwaggerModule.createDocument(app, config, options);
 
   SwaggerModule.setup('api', app, documentFactory, customOptions);
 };

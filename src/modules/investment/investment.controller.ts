@@ -1,34 +1,31 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { InvestmentService } from './investment.service';
-import { CreateInvestmentDto } from './dto/create-investment.dto';
-import { UpdateInvestmentDto } from './dto/update-investment.dto';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
+import { UserRole } from 'src/modules/user/user.model';
+import { CreateInvestmentDto, UpdateInvestmentDto } from './investment.dto';
+import { InvestmentsService } from './investment.service';
 
-@Controller('investment')
-export class InvestmentController {
-  constructor(private readonly investmentService: InvestmentService) {}
+@ApAuthGuard(UserRole.USER)
+@ApiTags('Investments')
+@Controller('investments')
+export class InvestmentsController {
+  constructor(private readonly service: InvestmentsService) {}
 
-  @Post()
-  create(@Body() createInvestmentDto: CreateInvestmentDto) {
-    return this.investmentService.create(createInvestmentDto);
+  @Post(':userId')
+  @ApiOperation({ summary: 'Create a new investment for a user' })
+  create(@Param('userId') userId: string, @Body() dto: CreateInvestmentDto) {
+    return this.service.create(userId, dto);
   }
 
-  @Get()
-  findAll() {
-    return this.investmentService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.investmentService.findOne(+id);
+  @Get(':userId')
+  @ApiOperation({ summary: 'Get all investments for a user' })
+  findAll(@Param('userId') userId: string) {
+    return this.service.findAll(userId);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateInvestmentDto: UpdateInvestmentDto) {
-    return this.investmentService.update(+id, updateInvestmentDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.investmentService.remove(+id);
+  @ApiOperation({ summary: 'Update an investment status' })
+  update(@Param('id') id: string, @Body() dto: UpdateInvestmentDto) {
+    return this.service.update(id, dto);
   }
 }

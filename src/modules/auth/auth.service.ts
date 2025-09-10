@@ -1,26 +1,97 @@
-import { Injectable } from '@nestjs/common';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import axios from 'axios';
+import { Request } from 'express';
+import { db, dbAuth } from 'src/main';
+import { TokenResponse } from 'src/modules/auth/auth.model';
+import { LoginDto } from './auth.dto';
+
+interface AuthenticatedRequest extends Request {
+  user: any;
+}
 
 @Injectable()
 export class AuthService {
-  create(createAuthDto: CreateAuthDto) {
-    return 'This action adds a new auth';
+  async login(model: LoginDto): Promise<TokenResponse> {
+    const { email, password } = model;
+    try {
+      const { idToken, refreshToken, expiresIn } =
+        await this.signInWithEmailAndPassword(email, password);
+      return { idToken, refreshToken, expiresIn };
+    } catch (error: any) {
+      console.error(
+        (error &&
+          typeof error === 'object' &&
+          'response' in error &&
+          (error as { response?: { data?: any } }).response?.data) ||
+          error,
+        'Error logging in user',
+      );
+      throw new UnauthorizedException('Invalid credentials');
+    }
   }
 
-  findAll() {
-    return `This action returns all auth`;
+  private async signInWithEmailAndPassword(
+    email: string,
+    password: string,
+  ): Promise<{ idToken: string; refreshToken: string; expiresIn: string }> {
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_API_KEY}`;
+    return await this.sendPostRequest(url, {
+      email,
+      password,
+      returnSecureToken: true,
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} auth`;
+  private async sendPostRequest<T>(url: string, data: any): Promise<T> {
+    try {
+      const response = await axios.post<T>(url, data, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error(error, 'Error sending POST request');
+      throw new UnauthorizedException('Authentication failed');
+    }
   }
 
-  update(id: number, updateAuthDto: UpdateAuthDto) {
-    return `This action updates a #${id} auth`;
-  }
+  async validateRequest(req: Request): Promise<boolean> {
+    const authHeader = req.headers['authorization'];
+    console.log(req.headers, 'Request Headers');
+    if (!authHeader) {
+      throw new UnauthorizedException('Authorization header missing');
+    }
 
-  remove(id: number) {
-    return `This action removes a #${id} auth`;
+    const [bearer, token] = authHeader.split(' ');
+
+    if (bearer !== 'Bearer' || !token) {
+      throw new UnauthorizedException(
+        "Invalid authorization format. Use 'Bearer <token>'",
+      );
+    }
+
+    try {
+      const decodedToken = await dbAuth.verifyIdToken(token);
+      const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+
+      if (!userDoc.exists) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      const docData = userDoc.data() as { role?: string } | undefined;
+      const userData = {
+        uid: decodedToken.uid,
+        email: decodedToken.email,
+        role: docData?.role ?? 'user',
+      };
+
+      if (userData) (req as AuthenticatedRequest).user = userData;
+      return true;
+    } catch (error) {
+      console.error('Error verifying token: ', error);
+      throw new UnauthorizedException('Invalid or expired token');
+    }
   }
 }

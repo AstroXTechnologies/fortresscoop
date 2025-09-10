@@ -1,34 +1,29 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+// dashboard.controller.ts
+import { Controller, Get, Param } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
+import { UserRole } from 'src/modules/user/user.model';
+import { AdminDashboardDto, UserDashboardDto } from './dashboard.dto';
 import { DashboardService } from './dashboard.service';
-import { CreateDashboardDto } from './dto/create-dashboard.dto';
-import { UpdateDashboardDto } from './dto/update-dashboard.dto';
 
+@ApiTags('Dashboard')
 @Controller('dashboard')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
-  @Post()
-  create(@Body() createDashboardDto: CreateDashboardDto) {
-    return this.dashboardService.create(createDashboardDto);
+  @ApAuthGuard(UserRole.USER)
+  @Get('user/:userId')
+  @ApiOperation({ summary: 'Get dashboard summary for a user' })
+  async getUserDashboard(
+    @Param('userId') userId: string,
+  ): Promise<UserDashboardDto> {
+    return this.dashboardService.getUserDashboard(userId);
   }
 
-  @Get()
-  findAll() {
-    return this.dashboardService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.dashboardService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateDashboardDto: UpdateDashboardDto) {
-    return this.dashboardService.update(+id, updateDashboardDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.dashboardService.remove(+id);
+  @ApAuthGuard(UserRole.ADMIN)
+  @Get('admin')
+  @ApiOperation({ summary: 'Get admin dashboard summary' })
+  async getAdminDashboard(): Promise<AdminDashboardDto> {
+    return this.dashboardService.getAdminDashboard();
   }
 }

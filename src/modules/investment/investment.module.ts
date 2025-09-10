@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
-import { InvestmentService } from './investment.service';
-import { InvestmentController } from './investment.controller';
+import { AuthModule } from 'src/modules/auth/auth.module';
+import { InvestmentsController } from './investment.controller';
+import { InvestmentsService } from './investment.service';
+import { InvestmentProductsModule } from './product/product.module';
 
 @Module({
-  controllers: [InvestmentController],
-  providers: [InvestmentService],
+  controllers: [InvestmentsController],
+  providers: [InvestmentsService],
+  exports: [InvestmentsService],
+  imports: [InvestmentProductsModule, AuthModule],
 })
 export class InvestmentModule {}

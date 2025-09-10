@@ -1,34 +1,51 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
+import { UserRole } from 'src/modules/user/user.model';
+import { CreateSavingDto, UpdateSavingDto } from './savings.dto';
 import { SavingsService } from './savings.service';
-import { CreateSavingDto } from './dto/create-saving.dto';
-import { UpdateSavingDto } from './dto/update-saving.dto';
 
+@ApAuthGuard(UserRole.USER)
+@ApiTags('Savings')
 @Controller('savings')
 export class SavingsController {
-  constructor(private readonly savingsService: SavingsService) {}
+  constructor(private readonly service: SavingsService) {}
 
   @Post()
-  create(@Body() createSavingDto: CreateSavingDto) {
-    return this.savingsService.create(createSavingDto);
+  @ApiOperation({ summary: 'Start a new savings plan' })
+  create(@Body() dto: CreateSavingDto) {
+    return this.service.create(dto);
   }
 
   @Get()
+  @ApiOperation({ summary: 'Get all savings records' })
   findAll() {
-    return this.savingsService.findAll();
+    return this.service.findAll();
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get a savings record by ID' })
   findOne(@Param('id') id: string) {
-    return this.savingsService.findOne(+id);
+    return this.service.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateSavingDto: UpdateSavingDto) {
-    return this.savingsService.update(+id, updateSavingDto);
+  @ApiOperation({ summary: 'Update a savings record by ID' })
+  update(@Param('id') id: string, @Body() dto: UpdateSavingDto) {
+    return this.service.update(id, dto);
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Close a savings record by ID' })
   remove(@Param('id') id: string) {
-    return this.savingsService.remove(+id);
+    return this.service.remove(id);
   }
 }
