@@ -6,10 +6,10 @@ import * as firebaseAdmin from 'firebase-admin';
 import { AppModule } from './app.module';
 dotenv.config();
 
-// const filePath =
-//   process.env.SERVICE_ACCOUNT_PATH || '/etc/secrets/serviceAccount.json';
+const filePath =
+  process.env.SERVICE_ACCOUNT_PATH || '/etc/secrets/serviceAccount.json';
 
-const filePath = process.env.SERVICE_ACCOUNT_PATH || './serviceAccount.json';
+// const filePath = process.env.SERVICE_ACCOUNT_PATH || './serviceAccount.json';
 
 firebaseAdmin.initializeApp({
   credential: firebaseAdmin.credential.cert(filePath),
