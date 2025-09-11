@@ -39,7 +39,7 @@ export class AuthGuard implements CanActivate {
       throw new ForbiddenException('User role not found');
     }
     if (!requiredRoles.includes(user.role)) {
-      throw new ForbiddenException('Insufficient role');
+      throw new ForbiddenException(`only ${requiredRoles[0]} allowed`);
     }
     return true;
   }

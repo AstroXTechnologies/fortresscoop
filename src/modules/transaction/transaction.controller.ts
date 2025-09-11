@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CreateTransactionDto, UpdateTransactionDto } from './transaction.dto';
 
 import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
@@ -7,6 +7,7 @@ import { UserRole } from 'src/modules/user/user.model';
 import { TransactionsService } from './transaction.service';
 
 @ApAuthGuard(UserRole.ADMIN)
+@ApiBearerAuth('access-token')
 @ApiTags('Transactions')
 @Controller('transactions')
 export class TransactionsController {

@@ -1,11 +1,12 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
 import { UserRole } from 'src/modules/user/user.model';
 import { CreateInvestmentDto, UpdateInvestmentDto } from './investment.dto';
 import { InvestmentsService } from './investment.service';
 
 @ApAuthGuard(UserRole.USER)
+@ApiBearerAuth('access-token')
 @ApiTags('Investments')
 @Controller('investments')
 export class InvestmentsController {

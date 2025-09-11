@@ -1,4 +1,5 @@
 export class User {
+  uid?: string;
   email: string;
   fullName: string;
   phoneNumber: string;

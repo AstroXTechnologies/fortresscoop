@@ -7,13 +7,14 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
 import { UserRole } from 'src/modules/user/user.model';
 import { CreateSavingDto, UpdateSavingDto } from './savings.dto';
 import { SavingsService } from './savings.service';
 
 @ApAuthGuard(UserRole.USER)
+@ApiBearerAuth('access-token')
 @ApiTags('Savings')
 @Controller('savings')
 export class SavingsController {

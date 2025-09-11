@@ -2,7 +2,6 @@ import { INestApplication } from '@nestjs/common';
 import {
   DocumentBuilder,
   SwaggerCustomOptions,
-  SwaggerDocumentOptions,
   SwaggerModule,
 } from '@nestjs/swagger';
 
@@ -20,21 +19,20 @@ export const setupSwagger = (app: INestApplication) => {
         in: 'header',
         name: 'Authorization',
       },
-      'bearer',
+      'access-token',
     )
     .build();
 
-  const options: SwaggerDocumentOptions = {
-    operationIdFactory: (controllerKey: string, methodKey: string) => methodKey,
-    security: [{ bearer: [] }],
-  };
   const customOptions: SwaggerCustomOptions = {
     useGlobalPrefix: true,
     customfavIcon: 'https://fav.farm/🛡️',
     customSiteTitle: 'Fortresscoop API Docs',
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
   };
 
-  const documentFactory = SwaggerModule.createDocument(app, config, options);
+  const documentFactory = SwaggerModule.createDocument(app, config);
 
   SwaggerModule.setup('api', app, documentFactory, customOptions);
 };

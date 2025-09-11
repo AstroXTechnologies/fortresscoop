@@ -7,7 +7,12 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
 import { UserRole } from 'src/modules/user/user.model';
 import {
@@ -17,7 +22,8 @@ import {
 import { Wallet } from 'src/modules/wallet/wallet.model';
 import { WalletService } from './wallet.service';
 
-@ApAuthGuard(UserRole.USER)
+@ApAuthGuard(UserRole.ADMIN)
+@ApiBearerAuth('access-token')
 @ApiTags('wallets')
 @Controller('wallets')
 export class WalletController {

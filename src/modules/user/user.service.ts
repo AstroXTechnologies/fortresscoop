@@ -23,6 +23,7 @@ export class UserService {
       }
 
       await this.saveUser(created.uid, {
+        uid: created?.uid,
         email: created?.email ?? '',
         fullName: created?.displayName ?? '',
         phoneNumber: model?.phoneNumber,
