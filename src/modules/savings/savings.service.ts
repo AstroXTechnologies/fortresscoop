@@ -4,7 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { db } from 'src/main';
-import { CreateSavingDto, UpdateSavingDto } from './savings.dto';
+import {
+  CreateSavingDto,
+  SavingPlanType,
+  UpdateSavingDto,
+} from './savings.dto';
 import { Saving } from './savings.model';
 
 @Injectable()
@@ -13,27 +17,52 @@ export class SavingsService {
   private walletCollection = 'wallets';
   private transactionCollection = 'transactions';
 
+  private ratesMap: Record<number, number> = {
+    33: 10,
+    66: 12,
+    99: 14,
+    122: 16,
+    188: 18,
+    366: 20,
+  };
+
+  private calculateInterest(
+    amount: number,
+    durationInDays: number,
+  ): { interestRate: number; expectedInterest: number } {
+    const rate = this.ratesMap[durationInDays];
+    if (!rate) throw new BadRequestException('Invalid duration selected');
+
+    // Simple interest: (Principal * Rate% * Time_in_days / 365)
+    const expectedInterest = (amount * rate * durationInDays) / (100 * 365);
+    return {
+      interestRate: rate,
+      expectedInterest: parseFloat(expectedInterest.toFixed(2)),
+    };
+  }
+
   async create(dto: CreateSavingDto): Promise<Saving> {
-    const { userId, planType, amount, durationInDays, goalAmount } = dto;
+    const { userId, amount, durationInDays } = dto;
 
     const walletRef = db.collection(this.walletCollection).doc(userId);
     const savingRef = db.collection(this.collection).doc();
     const now = new Date();
 
-    let maturityDate: Date | undefined;
-    if (durationInDays) {
-      maturityDate = new Date(now);
-      maturityDate.setDate(now.getDate() + durationInDays);
-    }
+    const maturityDate = new Date(now);
+    maturityDate.setDate(now.getDate() + durationInDays);
+
+    const { interestRate, expectedInterest } = this.calculateInterest(
+      amount,
+      durationInDays,
+    );
 
     await db.runTransaction(async (t) => {
       const walletSnap = await t.get(walletRef);
       if (!walletSnap.exists) throw new NotFoundException('Wallet not found');
 
       const walletData = walletSnap.data() || { balance: 0 };
-      if (walletData.balance < amount) {
+      if (walletData.balance < amount)
         throw new BadRequestException('Insufficient wallet balance');
-      }
 
       // Deduct from wallet
       t.update(walletRef, { balance: walletData.balance - amount });
@@ -42,10 +71,11 @@ export class SavingsService {
       const saving: Saving = {
         id: savingRef.id,
         userId,
-        planType,
+        planType: SavingPlanType.FIXED,
         balance: amount,
-        goalAmount,
         durationInDays,
+        interestRate,
+        expectedInterest,
         startDate: now,
         maturityDate,
         status: 'ACTIVE',
@@ -84,20 +114,39 @@ export class SavingsService {
     return doc.data() as Saving;
   }
 
+  preview(amount: number, durationInDays: number) {
+    const now = new Date();
+    const maturityDate = new Date(now);
+    maturityDate.setDate(now.getDate() + durationInDays);
+
+    const { interestRate, expectedInterest } = this.calculateInterest(
+      amount,
+      durationInDays,
+    );
+
+    return {
+      principal: amount,
+      interestRate,
+      duration: durationInDays,
+      expectedInterest,
+      maturityDate,
+    };
+  }
+
   async update(id: string, dto: UpdateSavingDto): Promise<Saving> {
     const docRef = db.collection(this.collection).doc(id);
     const doc = await docRef.get();
     if (!doc.exists)
       throw new NotFoundException(`Saving with id ${id} not found`);
 
-    const updated = {
-      ...doc.data(),
+    const updatedData: Partial<Saving> = {
+      ...(doc.data() as Partial<Saving>),
       ...dto,
       updatedAt: new Date(),
-    } as Saving;
+    };
 
-    await docRef.update(updated as any);
-    return updated;
+    await docRef.update(updatedData);
+    return updatedData as Saving;
   }
 
   async remove(id: string): Promise<void> {

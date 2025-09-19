@@ -14,9 +14,9 @@ export class AuthService {
   async login(model: LoginDto): Promise<TokenResponse> {
     const { email, password } = model;
     try {
-      const { idToken, refreshToken, expiresIn } =
+      const { idToken, refreshToken, expiresIn, localId, displayName } =
         await this.signInWithEmailAndPassword(email, password);
-      return { idToken, refreshToken, expiresIn };
+      return { idToken, refreshToken, expiresIn, localId, displayName };
     } catch (error: any) {
       console.error(
         (error &&
@@ -33,7 +33,13 @@ export class AuthService {
   private async signInWithEmailAndPassword(
     email: string,
     password: string,
-  ): Promise<{ idToken: string; refreshToken: string; expiresIn: string }> {
+  ): Promise<{
+    idToken: string;
+    refreshToken: string;
+    expiresIn: string;
+    displayName: string;
+    localId: string;
+  }> {
     const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_API_KEY}`;
     return await this.sendPostRequest(url, {
       email,
@@ -59,7 +65,7 @@ export class AuthService {
 
   async validateRequest(req: Request): Promise<boolean> {
     const authHeader = req.headers['authorization'];
-    console.log(req.headers, 'Request Headers');
+
     if (!authHeader) {
       throw new UnauthorizedException('Authorization header missing');
     }

@@ -2,12 +2,13 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { db } from 'src/main';
 import { Wallet } from 'src/modules/wallet/wallet.model';
 import { CreateTransactionDto, UpdateTransactionDto } from './transaction.dto';
-import { Transaction } from './transaction.model';
+import { Transaction, TransactionHistory } from './transaction.model';
 
 @Injectable()
 export class TransactionsService {
   private collection = 'transactions';
   private walletCollection = 'wallets';
+  private historyCollection = 'transaction_histories';
 
   async create(
     userId: string,
@@ -26,7 +27,30 @@ export class TransactionsService {
     };
 
     await db.collection(this.collection).doc(id).set(transaction);
+
+    await this.createHistory(
+      transaction.id,
+      userId,
+      `Transaction created: ${dto.type} of amount ${dto.amount}`,
+    );
+
     return transaction;
+  }
+
+  private async createHistory(
+    transactionId: string,
+    userId: string,
+    description: string,
+  ): Promise<void> {
+    const id = db.collection(this.historyCollection).doc().id;
+    const history: TransactionHistory = {
+      id,
+      transactionId,
+      userId,
+      description,
+      createdAt: new Date(),
+    };
+    await db.collection(this.historyCollection).doc(id).set(history);
   }
 
   async findAll(userId: string): Promise<Transaction[]> {
@@ -49,8 +73,19 @@ export class TransactionsService {
     await ref.update({ status: dto.status });
     const updated = { ...transaction, status: dto.status };
 
+    await this.createHistory(
+      id,
+      transaction.userId,
+      `Transaction status updated to ${dto.status}`,
+    );
+
     if (dto.status === 'SUCCESS') {
       await this.applyWalletEffect(updated);
+      await this.createHistory(
+        id,
+        transaction.userId,
+        `Transaction status updated to ${dto.status}`,
+      );
     }
 
     return updated;
@@ -111,5 +146,29 @@ export class TransactionsService {
     }
 
     await walletRef.update({ balance: newBalance });
+  }
+
+  async getTransactionHistoryByTransactionId(
+    transactionId: string,
+  ): Promise<TransactionHistory[]> {
+    const snapshot = await db
+      .collection(this.historyCollection)
+      .where('transactionId', '==', transactionId)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    return snapshot.docs.map((doc) => doc.data() as TransactionHistory);
+  }
+
+  async getTransactionHistoryByUserId(
+    userId: string,
+  ): Promise<TransactionHistory[]> {
+    const snapshot = await db
+      .collection(this.historyCollection)
+      .where('userId', '==', userId)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    return snapshot.docs.map((doc) => doc.data() as TransactionHistory);
   }
 }

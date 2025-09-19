@@ -6,8 +6,9 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
 import { UserRole } from 'src/modules/user/user.model';
 import { CreateUserDto } from './user.dto';
@@ -19,7 +20,7 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post('create')
-  create(@Body() createUserDto: CreateUserDto) {
+  createUser(@Body() createUserDto: CreateUserDto) {
     return this.userService.create(createUserDto);
   }
 
@@ -29,21 +30,33 @@ export class UserController {
     return this.userService.findAll();
   }
 
-  @ApAuthGuard(UserRole.ADMIN)
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(id);
+  @ApAuthGuard(UserRole.USER, UserRole.ADMIN)
+  @ApiQuery({
+    name: 'email',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'uid',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'name',
+    required: false,
+  })
+  @Get('findOne')
+  findOneUser(@Query() model: Partial<CreateUserDto>) {
+    return this.userService.findOne({ ...model });
   }
 
   @ApAuthGuard(UserRole.ADMIN)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: CreateUserDto) {
+  updateUser(@Param('id') id: string, @Body() updateUserDto: CreateUserDto) {
     return this.userService.update(id, updateUserDto);
   }
 
   @ApAuthGuard(UserRole.ADMIN)
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  removeUser(@Param('id') id: string) {
     return this.userService.remove(id);
   }
 }

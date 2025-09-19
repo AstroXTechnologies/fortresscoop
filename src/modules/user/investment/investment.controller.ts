@@ -17,7 +17,7 @@ import {
 import { UserInvestmentsService } from './investment.service';
 
 @ApiBearerAuth('access-token')
-@ApAuthGuard(UserRole.ADMIN)
+@ApAuthGuard(UserRole.USER)
 @ApiTags('User Investments')
 @Controller('user-investments')
 export class UserInvestmentsController {
@@ -27,31 +27,34 @@ export class UserInvestmentsController {
   @ApiOperation({
     summary: 'Create a new user investment (subscribe to a product)',
   })
-  create(@Body() dto: CreateUserInvestmentDto) {
+  createUserInvestment(@Body() dto: CreateUserInvestmentDto) {
     return this.service.create(dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all user investments' })
-  findAll() {
+  findAllUserInvestments() {
     return this.service.findAll();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a user investment by ID' })
-  findOne(@Param('id') id: string) {
+  findOneUserInvestment(@Param('id') id: string) {
     return this.service.findOne(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update a user investment by ID (rarely used)' })
-  update(@Param('id') id: string, @Body() dto: UpdateUserInvestmentDto) {
+  updateUserInvestment(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserInvestmentDto,
+  ) {
     return this.service.update(id, dto);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Cancel a user investment by ID' })
-  remove(@Param('id') id: string) {
+  removeUserInvestment(@Param('id') id: string) {
     return this.service.remove(id);
   }
 }

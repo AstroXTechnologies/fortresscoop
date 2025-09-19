@@ -1,5 +1,5 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsEnum, IsNumber, IsPositive, IsString } from 'class-validator';
+import { IsNumber, IsPositive, IsString } from 'class-validator';
 
 export enum SavingPlanType {
   FLEXIBLE = 'FLEXIBLE',
@@ -15,34 +15,31 @@ export class CreateSavingDto {
   @IsString()
   userId: string;
 
-  @ApiProperty({
-    description: 'Type of savings plan',
-    enum: SavingPlanType,
-    example: SavingPlanType.FLEXIBLE,
-  })
-  @IsEnum(SavingPlanType)
-  planType: SavingPlanType;
-
   @ApiProperty({ description: 'Amount to save initially', example: 2000 })
   @IsNumber()
   @IsPositive()
   amount: number;
 
   @ApiProperty({
-    description: 'Optional savings goal (only for TARGET plan)',
-    example: 50000,
-    required: false,
+    description: 'Duration in days (33, 66, 99, 122, 188, 366)',
+    example: 99,
   })
   @IsNumber()
-  goalAmount?: number;
+  durationInDays: number;
+}
+
+export class PreviewSavingDto {
+  @ApiProperty({ description: 'Amount to save', example: 2000 })
+  @IsNumber()
+  @IsPositive()
+  amount: number;
 
   @ApiProperty({
-    description: 'Duration in days (for FIXED or TARGET plans)',
-    example: 180,
-    required: false,
+    description: 'Duration in days (33, 66, 99, 122, 188, 366)',
+    example: 99,
   })
   @IsNumber()
-  durationInDays?: number;
+  durationInDays: number;
 }
 
 export class UpdateSavingDto extends PartialType(CreateSavingDto) {}

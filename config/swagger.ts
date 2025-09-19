@@ -27,12 +27,15 @@ export const setupSwagger = (app: INestApplication) => {
     useGlobalPrefix: true,
     customfavIcon: 'https://fav.farm/🛡️',
     customSiteTitle: 'Fortresscoop API Docs',
+
     swaggerOptions: {
       persistAuthorization: true,
     },
   };
 
-  const documentFactory = SwaggerModule.createDocument(app, config);
+  const documentFactory = SwaggerModule.createDocument(app, config, {
+    operationIdFactory: (controllerKey: string, methodKey: string) => methodKey,
+  });
 
   SwaggerModule.setup('api', app, documentFactory, customOptions);
 };

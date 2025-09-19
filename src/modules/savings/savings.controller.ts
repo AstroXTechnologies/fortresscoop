@@ -8,12 +8,14 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
-import { UserRole } from 'src/modules/user/user.model';
-import { CreateSavingDto, UpdateSavingDto } from './savings.dto';
+import {
+  CreateSavingDto,
+  PreviewSavingDto,
+  UpdateSavingDto,
+} from './savings.dto';
 import { SavingsService } from './savings.service';
 
-@ApAuthGuard(UserRole.USER)
+// @ApAuthGuard(UserRole.USER)
 @ApiBearerAuth('access-token')
 @ApiTags('Savings')
 @Controller('savings')
@@ -21,32 +23,38 @@ export class SavingsController {
   constructor(private readonly service: SavingsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Start a new savings plan' })
-  create(@Body() dto: CreateSavingDto) {
+  @ApiOperation({ summary: 'Start a new fixed-term savings plan (UI aligned)' })
+  createSavings(@Body() dto: CreateSavingDto) {
     return this.service.create(dto);
+  }
+
+  @Post('preview')
+  @ApiOperation({ summary: 'Preview savings plan before creating' })
+  previewSavings(@Body() dto: PreviewSavingDto) {
+    return this.service.preview(dto.amount, dto.durationInDays);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all savings records' })
-  findAll() {
+  findAllSavings() {
     return this.service.findAll();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a savings record by ID' })
-  findOne(@Param('id') id: string) {
+  findOneSavings(@Param('id') id: string) {
     return this.service.findOne(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update a savings record by ID' })
-  update(@Param('id') id: string, @Body() dto: UpdateSavingDto) {
+  updateSavings(@Param('id') id: string, @Body() dto: UpdateSavingDto) {
     return this.service.update(id, dto);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Close a savings record by ID' })
-  remove(@Param('id') id: string) {
+  removeSavings(@Param('id') id: string) {
     return this.service.remove(id);
   }
 }

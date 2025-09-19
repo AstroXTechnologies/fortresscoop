@@ -14,19 +14,22 @@ export class InvestmentsController {
 
   @Post(':userId')
   @ApiOperation({ summary: 'Create a new investment for a user' })
-  create(@Param('userId') userId: string, @Body() dto: CreateInvestmentDto) {
+  createInvestment(
+    @Param('userId') userId: string,
+    @Body() dto: CreateInvestmentDto,
+  ) {
     return this.service.create(userId, dto);
   }
 
   @Get(':userId')
   @ApiOperation({ summary: 'Get all investments for a user' })
-  findAll(@Param('userId') userId: string) {
+  findAllInvestments(@Param('userId') userId: string) {
     return this.service.findAll(userId);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update an investment status' })
-  update(@Param('id') id: string, @Body() dto: UpdateInvestmentDto) {
+  updateInvestment(@Param('id') id: string, @Body() dto: UpdateInvestmentDto) {
     return this.service.update(id, dto);
   }
 }

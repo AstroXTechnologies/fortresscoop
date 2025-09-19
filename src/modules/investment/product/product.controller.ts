@@ -25,31 +25,34 @@ export class InvestmentProductsController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new investment product' })
-  create(@Body() dto: CreateInvestmentProductDto) {
+  createInvestmentProduct(@Body() dto: CreateInvestmentProductDto) {
     return this.service.create(dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all investment products' })
-  findAll() {
+  findAllInvestmentProducts() {
     return this.service.findAll();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get an investment product by ID' })
-  findOne(@Param('id') id: string) {
+  findOneInvestmentProduct(@Param('id') id: string) {
     return this.service.findOne(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update an investment product by ID' })
-  update(@Param('id') id: string, @Body() dto: UpdateInvestmentProductDto) {
+  updateInvestmentProduct(
+    @Param('id') id: string,
+    @Body() dto: UpdateInvestmentProductDto,
+  ) {
     return this.service.update(id, dto);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete an investment product by ID' })
-  remove(@Param('id') id: string) {
+  removeInvestmentProduct(@Param('id') id: string) {
     return this.service.remove(id);
   }
 }

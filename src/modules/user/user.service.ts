@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { db, dbAuth, dbFireStore } from 'src/main';
 import { CreateUserDto } from 'src/modules/user/user.dto';
 import { WalletService } from 'src/modules/wallet/wallet.service';
@@ -12,6 +16,31 @@ export class UserService {
 
   async create(model: CreateUserDto): Promise<any> {
     try {
+      const existingSnapshot = await db
+        .collection(this.collection)
+        .where('email', '==', model.email)
+        .limit(1)
+        .get();
+
+      if (!existingSnapshot.empty) {
+        throw new BadRequestException('User with this email already exists');
+      }
+
+      // Optionally, also check by phone number if provided
+      if (model.phoneNumber) {
+        const phoneSnapshot = await db
+          .collection(this.collection)
+          .where('phoneNumber', '==', model.phoneNumber)
+          .limit(1)
+          .get();
+
+        if (!phoneSnapshot.empty) {
+          throw new BadRequestException(
+            'User with this phone number already exists',
+          );
+        }
+      }
+
       const created = await dbAuth.createUser({
         displayName: model.fullName,
         email: model.email,
@@ -84,10 +113,38 @@ export class UserService {
     return snapshot.docs.map((doc) => doc.data() as User);
   }
 
-  async findOne(id: string): Promise<User> {
-    const doc = await db.collection(this.collection).doc(id).get();
-    if (!doc.exists) throw new NotFoundException('User not found');
-    return doc.data() as User;
+  async findOne(model: Partial<CreateUserDto>): Promise<User> {
+    const keys = Object.keys(model).filter(
+      (key) => model[key as keyof CreateUserDto] !== undefined,
+    );
+
+    if (keys.length === 0) {
+      throw new BadRequestException('At least one field is required to search');
+    }
+
+    // If uid is provided, fetch directly (faster)
+    if (model.uid) {
+      const doc = await db.collection(this.collection).doc(model.uid).get();
+      if (!doc.exists) throw new NotFoundException('User not found');
+      return { uid: doc.id, ...(doc.data() as User) };
+    }
+
+    // Otherwise, search by the first field provided
+    const field = keys[0];
+    const value = model[field as keyof CreateUserDto];
+
+    const snapshot = await db
+      .collection(this.collection)
+      .where(field, '==', value)
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) {
+      throw new NotFoundException(`User with ${field}=${value} not found`);
+    }
+
+    const doc = snapshot.docs[0];
+    return { uid: doc.id, ...(doc.data() as User) };
   }
 
   async update(id: string, data: Partial<User>): Promise<User> {

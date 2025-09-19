@@ -37,3 +37,20 @@ export class Transaction {
   @ApiProperty({ description: 'Date transaction was created' })
   createdAt: Date;
 }
+
+export class TransactionHistory {
+  @ApiProperty({ description: 'Unique ID of this history record' })
+  id: string;
+
+  @ApiProperty({ description: 'Transaction ID this history belongs to' })
+  transactionId: string;
+
+  @ApiProperty({ description: 'User ID associated with this transaction' })
+  userId: string;
+
+  @ApiProperty({ description: 'Description of the transaction activity' })
+  description: string;
+
+  @ApiProperty({ description: 'Date this history record was created' })
+  createdAt: Date;
+}
