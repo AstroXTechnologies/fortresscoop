@@ -34,7 +34,7 @@ export class ActiveLockupDto {
   duration: string;
 
   @ApiProperty({ example: 50000, description: 'Amount locked in Naira' })
-  amount: number;
+  balance: number;
 
   @ApiProperty({
     example: '2025-02-20',

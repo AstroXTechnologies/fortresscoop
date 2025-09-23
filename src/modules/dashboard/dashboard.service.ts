@@ -139,7 +139,7 @@ export class DashboardService {
     return lockupSnap.docs.map((doc) => {
       console.log(doc.data(), 'Lockup data');
       const lockup = doc.data() as {
-        amount: number;
+        balance: number;
         startDate: FirebaseFirestore.Timestamp;
         maturityDate: FirebaseFirestore.Timestamp;
         planType?: string;
@@ -157,7 +157,7 @@ export class DashboardService {
         : null;
 
       return {
-        amount: lockup.amount,
+        balance: lockup.balance,
         startDate,
         maturityDate,
         remainingDays,
