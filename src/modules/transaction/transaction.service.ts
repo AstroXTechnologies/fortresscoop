@@ -91,6 +91,22 @@ export class TransactionsService {
     return updated;
   }
 
+  async updateByReference(
+    reference: string,
+    dto: UpdateTransactionDto,
+  ): Promise<Transaction> {
+    const snapshot = await db
+      .collection(this.collection)
+      .where('reference', '==', reference)
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) throw new BadRequestException('Transaction not found');
+
+    const doc = snapshot.docs[0];
+    return this.update(doc.id, dto);
+  }
+
   private async applyWalletEffect(transaction: Transaction): Promise<void> {
     const walletRef = db
       .collection(this.walletCollection)
@@ -106,7 +122,7 @@ export class TransactionsService {
 
     switch (transaction.type) {
       case 'DEPOSIT':
-        newBalance += transaction.amount;
+        newBalance += Number(transaction.amount);
         break;
 
       case 'WITHDRAWAL':

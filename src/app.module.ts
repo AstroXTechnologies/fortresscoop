@@ -6,6 +6,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { InvestmentModule } from './modules/investment/investment.module';
+import { PaymentModule } from './modules/payment/payment.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { SavingsModule } from './modules/savings/savings.module';
 import { TransactionModule } from './modules/transaction/transaction.module';
@@ -24,6 +25,7 @@ import { WalletModule } from './modules/wallet/wallet.module';
     AnalyticsModule,
     ProfileModule,
     TransactionModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

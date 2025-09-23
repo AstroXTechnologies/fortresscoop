@@ -40,7 +40,18 @@ export class UserInvestmentsService {
     }
 
     // Deduct from wallet
-    const walletRef = db.collection('wallets').doc(userId);
+    const walletQuery = await db
+      .collection(this.walletCollection)
+      .where('userId', '==', userId)
+      .limit(1)
+      .get();
+
+    if (walletQuery.empty) {
+      throw new NotFoundException('Wallet not found');
+    }
+
+    const walletDoc = walletQuery.docs[0];
+    const walletRef = walletDoc.ref;
     const investmentRef = db.collection(this.collection).doc();
     const now = new Date();
     const maturityDate = new Date(now);

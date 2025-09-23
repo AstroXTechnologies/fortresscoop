@@ -57,4 +57,10 @@ export class SavingsController {
   removeSavings(@Param('id') id: string) {
     return this.service.remove(id);
   }
+
+  @Get('user/:userId')
+  @ApiOperation({ summary: 'Find user savings' })
+  findUserSavings(@Param('userId') userId: string) {
+    return this.service.findUserSavings(userId);
+  }
 }

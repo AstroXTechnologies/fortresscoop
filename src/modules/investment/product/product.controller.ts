@@ -8,15 +8,13 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
-import { UserRole } from 'src/modules/user/user.model';
 import {
   CreateInvestmentProductDto,
   UpdateInvestmentProductDto,
 } from './product.dto';
 import { InvestmentProductsService } from './product.service';
 
-@ApAuthGuard(UserRole.ADMIN)
+// @ApAuthGuard(UserRole.ADMIN)
 @ApiTags('Investment Products')
 @ApiBearerAuth('access-token')
 @Controller('investment-products')
