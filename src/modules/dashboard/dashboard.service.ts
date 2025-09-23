@@ -17,12 +17,12 @@ export class DashboardService {
 
     const savingsSnap = await savingsRef.get();
     const totalSavings = savingsSnap.docs.reduce((sum, doc) => {
-      const data = doc.data() as { amount?: number };
-      return sum + (data?.amount ?? 0);
+      const data = doc.data() as { balance?: number };
+      return sum + (data?.balance ?? 0);
     }, 0);
 
     const investmentsRef = db
-      .collection('investments')
+      .collection('userInvestments')
       .where('userId', '==', userId);
     const investmentsSnap = await investmentsRef.get();
 
@@ -46,15 +46,188 @@ export class DashboardService {
       ...doc.data(),
     }));
 
+    const now = new Date();
+    let totalProfit = 0;
+
+    // ✅ Savings profit (only matured)
+    savingsSnap.docs.forEach((doc) => {
+      const data = doc.data() as {
+        maturityDate?: FirebaseFirestore.Timestamp;
+        expectedInterest?: number;
+      };
+      const maturityDate = data.maturityDate?.toDate();
+      if (maturityDate && maturityDate <= now) {
+        totalProfit += data.expectedInterest || 0;
+      }
+    });
+
+    // ✅ Investments profit (only matured)
+    investmentsSnap.docs.forEach((doc) => {
+      const data = doc.data() as {
+        maturityDate?: FirebaseFirestore.Timestamp;
+        returnsAccrued?: number;
+      };
+      const maturityDate = data.maturityDate?.toDate();
+      if (maturityDate && maturityDate <= now) {
+        totalProfit += data.returnsAccrued || 0;
+      }
+    });
+
+    let nextPayout: { date: Date; amount: number } | null = null;
+
+    // Savings maturities
+    savingsSnap.docs.forEach((doc) => {
+      const data = doc.data() as {
+        maturityDate?: FirebaseFirestore.Timestamp;
+        expectedInterest?: number;
+      };
+      const maturityDate = data.maturityDate?.toDate();
+      if (maturityDate && maturityDate > now) {
+        const amount = data.expectedInterest || 0;
+        if (!nextPayout || maturityDate < nextPayout.date) {
+          nextPayout = { date: maturityDate, amount };
+        }
+      }
+    });
+
+    // Investment maturities
+    investmentsSnap.docs.forEach((doc) => {
+      const data = doc.data() as {
+        maturityDate?: FirebaseFirestore.Timestamp;
+        returnsAccrued?: number;
+      };
+      const maturityDate = data.maturityDate?.toDate();
+      if (maturityDate && maturityDate > now) {
+        const amount = data.returnsAccrued || 0;
+        if (!nextPayout || maturityDate < nextPayout.date) {
+          nextPayout = { date: maturityDate, amount };
+        }
+      }
+    });
+    const chartData: { month: string; savings: number; investments: number }[] =
+      await this.getPortfolioGrowth(userId);
+
+    // 🔹 Attach active lockup
+    const activeLockup = await this.getActiveLockup(userId);
+
     return {
       walletBalance,
       totalSavings,
       totalInvestments,
       activeInvestments,
       recentTransactions,
+      totalProfit,
+      nextPayout,
+      chartData,
+      activeLockup,
     };
   }
 
+  async getActiveLockup(userId: string) {
+    const lockupSnap = await db
+      .collection('savings')
+      .where('userId', '==', userId)
+      .where('status', '==', 'ACTIVE')
+      .get();
+
+    if (lockupSnap.empty) {
+      return [];
+    }
+
+    const now = new Date();
+
+    return lockupSnap.docs.map((doc) => {
+      console.log(doc.data(), 'Lockup data');
+      const lockup = doc.data() as {
+        amount: number;
+        startDate: FirebaseFirestore.Timestamp;
+        maturityDate: FirebaseFirestore.Timestamp;
+        planType?: string;
+        duration?: number;
+      };
+      const maturityDate = lockup.maturityDate?.toDate();
+      const startDate = lockup.startDate?.toDate();
+      const remainingDays = maturityDate
+        ? Math.max(
+            Math.ceil(
+              (maturityDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+            ),
+            0,
+          )
+        : null;
+
+      return {
+        amount: lockup.amount,
+        startDate,
+        maturityDate,
+        remainingDays,
+        planType: lockup.planType ?? '',
+        duration: String(
+          lockup.duration ??
+            (startDate && maturityDate
+              ? Math.ceil(
+                  (maturityDate.getTime() - startDate.getTime()) /
+                    (1000 * 60 * 60 * 24),
+                )
+              : 0),
+        ),
+      };
+    });
+  }
+
+  async getPortfolioGrowth(userId: string) {
+    const savingsSnap = await db
+      .collection('savings')
+      .where('userId', '==', userId)
+      .get();
+    const investmentsSnap = await db
+      .collection('userInvestments')
+      .where('userId', '==', userId)
+      .get();
+
+    const monthlyStats: Record<
+      string,
+      { savings: number; investments: number }
+    > = {};
+
+    const addToMonth = (
+      date: Date,
+      type: 'savings' | 'investments',
+      amount: number,
+    ) => {
+      const month = date.toLocaleString('default', { month: 'short' }); // e.g. Jan
+      if (!monthlyStats[month]) {
+        monthlyStats[month] = { savings: 0, investments: 0 };
+      }
+      monthlyStats[month][type] += amount;
+    };
+
+    // Savings
+    savingsSnap.docs.forEach((doc) => {
+      const data = doc.data() as {
+        balance?: number;
+        createdAt?: FirebaseFirestore.Timestamp;
+      };
+      if (data.createdAt)
+        addToMonth(data.createdAt.toDate(), 'savings', data.balance || 0);
+    });
+
+    // Investments
+    investmentsSnap.docs.forEach((doc) => {
+      const data = doc.data() as {
+        amount?: number;
+        createdAt?: FirebaseFirestore.Timestamp;
+      };
+      if (data.createdAt)
+        addToMonth(data.createdAt.toDate(), 'investments', data.amount || 0);
+    });
+
+    // Convert to array sorted by month
+    return Object.entries(monthlyStats).map(([month, values]) => ({
+      month,
+      ...values,
+    }));
+  }
   /** 🔹 Admin Dashboard Summary */
   async getAdminDashboard(): Promise<AdminDashboardDto> {
     const usersSnap = await db.collection('users').get();
