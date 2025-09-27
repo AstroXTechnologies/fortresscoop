@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Request } from 'express';
 import { db, dbAuth } from 'src/main';
 import { TokenResponse } from 'src/modules/auth/auth.model';
+import { UserService } from '../user/user.service';
 import { LoginDto } from './auth.dto';
 
 interface AuthenticatedRequest extends Request {
@@ -11,12 +12,15 @@ interface AuthenticatedRequest extends Request {
 
 @Injectable()
 export class AuthService {
+  constructor(private readonly userSvc: UserService) {}
   async login(model: LoginDto): Promise<TokenResponse> {
     const { email, password } = model;
     try {
       const { idToken, refreshToken, expiresIn, localId, displayName } =
         await this.signInWithEmailAndPassword(email, password);
-      return { idToken, refreshToken, expiresIn, localId, displayName };
+      const user = await this.userSvc.findOne({ uid: localId });
+      console.log(user, 'Logged in user');
+      return { idToken, refreshToken, expiresIn, localId, displayName, user };
     } catch (error: any) {
       console.error(
         (error &&

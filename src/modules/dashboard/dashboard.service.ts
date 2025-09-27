@@ -137,7 +137,6 @@ export class DashboardService {
     const now = new Date();
 
     return lockupSnap.docs.map((doc) => {
-      console.log(doc.data(), 'Lockup data');
       const lockup = doc.data() as {
         balance: number;
         startDate: FirebaseFirestore.Timestamp;

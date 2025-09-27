@@ -187,4 +187,30 @@ export class TransactionsService {
 
     return snapshot.docs.map((doc) => doc.data() as TransactionHistory);
   }
+
+  async deleteByReference(reference: string): Promise<void> {
+    const snapshot = await db
+      .collection(this.collection)
+      .where('reference', '==', reference)
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) throw new BadRequestException('Transaction not found');
+
+    const doc = snapshot.docs[0];
+    await db.collection(this.collection).doc(doc.id).delete();
+  }
+
+  async deleteById(id: string): Promise<void> {
+    const snapshot = await db
+      .collection(this.collection)
+      .where('id', '==', id)
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) throw new BadRequestException('Transaction not found');
+
+    const doc = snapshot.docs[0];
+    await db.collection(this.collection).doc(doc.id).delete();
+  }
 }

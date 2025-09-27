@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ApiClient } from 'config/apiClient';
+import isErrorWithMessage from 'utils/helper';
 import { TransactionsService } from '../transaction/transaction.service';
 import { PaymentInputDto } from './payment.dto';
 import { FlutterwaveTransactionResponse } from './payment.model';
@@ -14,8 +15,9 @@ export class PaymentService {
   }
 
   async initialize(data: PaymentInputDto) {
+    let transaction: { reference?: string } | undefined; // <-- declare outside try so catch can access it
     try {
-      const transaction = await this.transanctionsService.create(data.userId, {
+      transaction = await this.transanctionsService.create(data.userId, {
         walletId: data.walletId,
         type: 'DEPOSIT',
         amount: data.amount,
@@ -23,15 +25,15 @@ export class PaymentService {
       });
 
       const payload = {
-        tx_ref: transaction?.reference,
+        tx_ref: transaction.reference,
         amount: data.amount,
         currency: data.currency,
         redirect_url: data.redirect_url,
         payment_options: data.payment_options || 'card,banktransfer,ussd',
         customer: {
           email: data.email,
-          phone_number: data.phone_number,
-          fullname: data.fullname,
+          phoneNumber: data.phone_number,
+          name: data.fullname,
         },
         customizations: {
           title: 'Fortresscoop',
@@ -41,15 +43,27 @@ export class PaymentService {
       const response = await this.apiClient.post('/payments', payload);
       return response;
     } catch (error: unknown) {
-      let message = 'Payment initialization failed';
-      if (
-        error &&
-        typeof error === 'object' &&
-        'message' in error &&
-        typeof error?.message === 'string'
-      ) {
-        message = (error as { message: string }).message;
+      // transaction is available here
+      if (transaction?.reference) {
+        try {
+          if (
+            typeof this.transanctionsService.deleteByReference === 'function'
+          ) {
+            await this.transanctionsService.deleteByReference(
+              transaction.reference,
+            );
+          }
+        } catch {
+          // swallow or log cleanup failure
+        }
       }
+
+      let message = 'Payment initialization failed';
+
+      if (isErrorWithMessage(error)) {
+        message = error.message;
+      }
+
       throw new Error(message);
     }
   }
