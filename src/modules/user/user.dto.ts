@@ -1,5 +1,12 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsPhoneNumber, MinLength } from 'class-validator';
+import { ApiProperty, PartialType } from '@nestjs/swagger';
+import {
+  IsBoolean,
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsPhoneNumber,
+  MinLength,
+} from 'class-validator';
 
 export class CreateUserDto {
   uid: string;
@@ -21,4 +28,45 @@ export class CreateUserDto {
   @IsNotEmpty()
   @MinLength(6)
   password: string;
+}
+
+export class UpdateUserDto extends PartialType(CreateUserDto) {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @MinLength(3)
+  fullName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsPhoneNumber()
+  phoneNumber?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'User preference: global auto rollover',
+  })
+  @IsOptional()
+  @IsBoolean()
+  globalRollover?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: 'User preference: email notifications',
+  })
+  @IsOptional()
+  @IsBoolean()
+  emailNotifications?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: 'User preference: sms notifications',
+  })
+  @IsOptional()
+  @IsBoolean()
+  smsNotifications?: boolean;
 }

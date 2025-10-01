@@ -180,7 +180,45 @@ export class SavingsService {
       .get();
 
     if (snapshot.empty) return [];
-
-    return snapshot.docs.map((doc) => doc.data() as Savings);
+    const now = Date.now();
+    return snapshot.docs.map((doc) => {
+      const data = doc.data() as Savings & {
+        maturityDate?: any;
+        startDate?: any;
+      };
+      const startVal: unknown = data.startDate;
+      const maturityVal: unknown = data.maturityDate;
+      const toMs = (v: unknown): number => {
+        if (v instanceof Date) return v.getTime();
+        if (typeof v === 'string' || typeof v === 'number')
+          return new Date(v).getTime();
+        if (
+          v &&
+          typeof v === 'object' &&
+          '_seconds' in v &&
+          typeof (v as { _seconds?: unknown })._seconds === 'number'
+        ) {
+          return (v as { _seconds: number })._seconds * 1000;
+        }
+        return NaN;
+      };
+      const startMs = toMs(startVal);
+      const maturityMs = toMs(maturityVal);
+      let progress = 0;
+      if (!isNaN(startMs) && !isNaN(maturityMs) && startMs < maturityMs) {
+        progress = Math.min(
+          100,
+          Math.max(0, ((now - startMs) / (maturityMs - startMs)) * 100),
+        );
+      }
+      const remainingDays = !isNaN(maturityMs)
+        ? Math.max(0, Math.ceil((maturityMs - now) / (1000 * 60 * 60 * 24)))
+        : 0;
+      return {
+        ...data,
+        progress,
+        remainingDays,
+      } as Savings & { progress: number; remainingDays: number };
+    });
   }
 }

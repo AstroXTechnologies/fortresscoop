@@ -11,7 +11,7 @@ import {
 import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
 import { UserRole } from 'src/modules/user/user.model';
-import { CreateUserDto } from './user.dto';
+import { CreateUserDto, UpdateUserDto } from './user.dto';
 import { UserService } from './user.service';
 
 @Controller('user')
@@ -58,8 +58,15 @@ export class UserController {
 
   @ApAuthGuard(UserRole.ADMIN)
   @Patch(':id')
-  updateUser(@Param('id') id: string, @Body() updateUserDto: CreateUserDto) {
+  updateUser(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.userService.update(id, updateUserDto);
+  }
+
+  // user self-update (profile & settings)
+  @ApAuthGuard(UserRole.USER, UserRole.ADMIN)
+  @Patch('profile/:id')
+  updateOwn(@Param('id') id: string, @Body() body: UpdateUserDto) {
+    return this.userService.update(id, body);
   }
 
   @ApAuthGuard(UserRole.ADMIN)

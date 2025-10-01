@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { db, dbAuth, dbFireStore } from 'src/main';
-import { CreateUserDto } from 'src/modules/user/user.dto';
+import { CreateUserDto, UpdateUserDto } from 'src/modules/user/user.dto';
 import { WalletService } from 'src/modules/wallet/wallet.service';
 import { User, UserRole } from './user.model';
 
@@ -167,13 +167,17 @@ export class UserService {
     return { uid: doc.id, ...(doc.data() as User) };
   }
 
-  async update(id: string, data: Partial<User>): Promise<User> {
+  async update(id: string, data: UpdateUserDto): Promise<User> {
     const docRef = db.collection(this.collection).doc(id);
     const doc = await docRef.get();
     if (!doc.exists) throw new NotFoundException('User not found');
-
-    await docRef.update(data);
-    return { ...(doc.data() as User), ...data };
+    const base = doc.data() as User;
+    const updatePayload: Record<string, any> = {
+      ...data,
+      updatedAt: new Date(),
+    };
+    await docRef.update(updatePayload);
+    return { ...base, ...updatePayload } as User;
   }
 
   async remove(id: string): Promise<void> {
