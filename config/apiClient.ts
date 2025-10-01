@@ -21,7 +21,9 @@ export class ApiClient {
       return response.data;
     } catch (error) {
       console.error(`Error fetching ${endpoint}: `, error);
-      return null;
+      // Rethrow so callers can handle the error (and so upstream services
+      // don't accidentally receive `null` and return that to clients).
+      throw error;
     }
   }
 
@@ -36,7 +38,7 @@ export class ApiClient {
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching ${endpoint}: `, error);
-      return null;
+      throw error;
     }
   }
 
@@ -54,7 +56,7 @@ export class ApiClient {
       return response.data;
     } catch (error) {
       console.error(`Error fetching ${endpoint}: `, error);
-      return null;
+      throw error;
     }
   }
 
@@ -72,7 +74,7 @@ export class ApiClient {
       return response.data;
     } catch (error) {
       console.error(`Error fetching ${endpoint}: `, error);
-      return null;
+      throw error;
     }
   }
 }

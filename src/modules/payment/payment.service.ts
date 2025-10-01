@@ -15,6 +15,10 @@ export class PaymentService {
   }
 
   async initialize(data: PaymentInputDto) {
+    if (!data?.email) {
+      throw new BadRequestException('User email is required');
+    }
+
     let transaction: { reference?: string } | undefined; // <-- declare outside try so catch can access it
     try {
       transaction = await this.transanctionsService.create(data.userId, {
@@ -41,6 +45,7 @@ export class PaymentService {
         },
       };
       const response = await this.apiClient.post('/payments', payload);
+
       return response;
     } catch (error: unknown) {
       // transaction is available here

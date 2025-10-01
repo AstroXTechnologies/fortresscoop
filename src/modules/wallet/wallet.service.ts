@@ -38,8 +38,20 @@ export class WalletService {
       .collection(this.collection)
       .where('userId', '==', userId)
       .get();
-    if (snapshot.empty)
-      throw new NotFoundException('Wallet for user not found');
+    if (snapshot.empty) {
+      // Auto-create a wallet for new users to simplify client logic.
+      const id = db.collection(this.collection).doc().id;
+      const wallet: Wallet = {
+        id,
+        userId,
+        balance: 0,
+        currency: 'NGN',
+        createdAt: new Date(),
+      };
+      await db.collection(this.collection).doc(id).set(wallet);
+      return wallet;
+    }
+
     return snapshot.docs[0].data() as Wallet;
   }
 

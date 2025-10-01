@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 import { CreateAnalyticsDto } from './dto/create-analytics.dto';
 import { UpdateAnalyticsDto } from './dto/update-analytics.dto';
@@ -17,13 +25,21 @@ export class AnalyticsController {
     return this.analyticsService.findAll();
   }
 
+  @Get('user/:userId')
+  getUserAnalytics(@Param('userId') userId: string) {
+    return this.analyticsService.getUserAnalytics(userId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.analyticsService.findOne(+id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAnalyticsDto: UpdateAnalyticsDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateAnalyticsDto: UpdateAnalyticsDto,
+  ) {
     return this.analyticsService.update(+id, updateAnalyticsDto);
   }
 
