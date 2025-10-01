@@ -2,13 +2,16 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { Request } from 'express';
 import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
 import { UserRole } from 'src/modules/user/user.model';
 import { CreateUserDto, UpdateUserDto } from './user.dto';
@@ -24,7 +27,7 @@ export class UserController {
     return this.userService.create(createUserDto);
   }
 
-  @ApAuthGuard(UserRole.ADMIN)
+  @ApAuthGuard(UserRole.USER)
   @Get()
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'page', required: false })
@@ -38,7 +41,7 @@ export class UserController {
     return this.userService.findAll();
   }
 
-  @ApAuthGuard(UserRole.USER, UserRole.ADMIN)
+  @ApAuthGuard(UserRole.USER)
   @ApiQuery({
     name: 'email',
     required: false,
@@ -56,14 +59,24 @@ export class UserController {
     return this.userService.findOne({ ...model });
   }
 
-  @ApAuthGuard(UserRole.ADMIN)
+  // Unified update: admins can update any user; regular users only their own id
+  @ApAuthGuard(UserRole.USER, UserRole.ADMIN)
   @Patch(':id')
-  updateUser(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+  updateUser(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @Req() req: Request & { user?: { uid?: string; role?: string } },
+  ) {
+    const actor = req.user;
+    if (!actor) throw new ForbiddenException('Unauthenticated');
+    if (actor.role !== 'admin' && actor.uid !== id) {
+      throw new ForbiddenException('Not allowed to update other users');
+    }
     return this.userService.update(id, updateUserDto);
   }
 
   // user self-update (profile & settings)
-  @ApAuthGuard(UserRole.USER, UserRole.ADMIN)
+  @ApAuthGuard(UserRole.USER)
   @Patch('profile/:id')
   updateOwn(@Param('id') id: string, @Body() body: UpdateUserDto) {
     return this.userService.update(id, body);

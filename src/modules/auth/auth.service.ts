@@ -1,8 +1,13 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import axios from 'axios';
 import { Request } from 'express';
 import { db, dbAuth } from 'src/main';
 import { TokenResponse } from 'src/modules/auth/auth.model';
+import { User } from '../user/user.model';
 import { UserService } from '../user/user.service';
 import { LoginDto } from './auth.dto';
 
@@ -18,19 +23,65 @@ export class AuthService {
     try {
       const { idToken, refreshToken, expiresIn, localId, displayName } =
         await this.signInWithEmailAndPassword(email, password);
-      const user = await this.userSvc.findOne({ uid: localId });
-      console.log(user, 'Logged in user');
-      return { idToken, refreshToken, expiresIn, localId, displayName, user };
-    } catch (error: any) {
-      console.error(
-        (error &&
-          typeof error === 'object' &&
-          'response' in error &&
-          (error as { response?: { data?: any } }).response?.data) ||
-          error,
-        'Error logging in user',
-      );
-      throw new UnauthorizedException('Invalid credentials');
+
+      // Will hold ensured user record
+      let user: User;
+      try {
+        user = await this.userSvc.findOne({ uid: localId });
+      } catch (err) {
+        // Auto-provision Firestore user doc if missing (legacy Firebase-only account)
+        if (err instanceof NotFoundException) {
+          try {
+            const firebaseUser = await dbAuth.getUser(localId);
+            await this.userSvc.saveUser(localId, {
+              uid: localId,
+              email: firebaseUser.email ?? email,
+              fullName: firebaseUser.displayName ?? firebaseUser.email ?? '',
+              joinDate: new Date().toISOString(),
+              lastLogin: new Date().toISOString(),
+              role: 'user',
+            });
+            user = await this.userSvc.findOne({ uid: localId });
+          } catch (provisionErr) {
+            console.error('Failed to auto-provision user doc', provisionErr);
+            throw provisionErr;
+          }
+        } else {
+          throw err;
+        }
+      }
+
+      if (!user.uid) {
+        user.uid = localId;
+      }
+      return {
+        idToken,
+        refreshToken,
+        expiresIn,
+        localId,
+        displayName,
+        user,
+      };
+    } catch (error: unknown) {
+      interface AxiosLikeError {
+        response?: { data?: { error?: { message?: string } } };
+        message?: string;
+      }
+      let firebaseMessage: string | undefined;
+      if (error && typeof error === 'object') {
+        const err = error as AxiosLikeError;
+        firebaseMessage =
+          err.response?.data?.error?.message || err.message || undefined;
+      }
+      console.error(firebaseMessage || error, 'Error logging in user');
+      // Surface more specific Firebase auth errors when available
+      const friendly = firebaseMessage
+        ? firebaseMessage
+            .replace(/_/g, ' ')
+            .toLowerCase()
+            .replace(/^[a-z]/, (c) => c.toUpperCase())
+        : 'Invalid credentials';
+      throw new UnauthorizedException(friendly);
     }
   }
 
