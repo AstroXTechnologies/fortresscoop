@@ -145,7 +145,7 @@ export class AuthService {
       const userData = {
         uid: decodedToken.uid,
         email: decodedToken.email,
-        role: docData?.role ?? 'user',
+        role: (docData?.role ?? 'user')?.toLowerCase(),
       };
 
       if (userData) (req as AuthenticatedRequest).user = userData;
