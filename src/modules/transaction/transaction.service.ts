@@ -58,7 +58,67 @@ export class TransactionsService {
       .collection(this.collection)
       .where('userId', '==', userId)
       .get();
-    return snapshot.docs.map((doc) => doc.data() as Transaction);
+    return snapshot.docs.map((doc) => {
+      const data = doc.data() as Transaction & { id?: string };
+      // Fallback to Firestore document ID if missing (legacy records)
+      if (!data.id) data.id = doc.id;
+      return data as Transaction;
+    });
+  }
+
+  // Paginated user transactions (cursor = createdAt millis of last item from previous page)
+  async findAllPaginated(
+    userId: string,
+    limit = 25,
+    cursor?: string,
+  ): Promise<{ items: Transaction[]; nextCursor?: string; hasMore: boolean }> {
+    if (limit <= 0) limit = 25;
+    if (limit > 100) limit = 100;
+    let query = db
+      .collection(this.collection)
+      .where('userId', '==', userId)
+      .orderBy('createdAt', 'desc')
+      .limit(limit + 1); // fetch one extra to determine hasMore
+
+    if (cursor) {
+      const cursorDate = new Date(Number(cursor));
+      if (!isNaN(cursorDate.getTime())) {
+        query = query.startAfter(cursorDate);
+      }
+    }
+
+    const snapshot = await query.get();
+    const docs = snapshot.docs;
+    const hasMore = docs.length > limit;
+    const slice = hasMore ? docs.slice(0, limit) : docs;
+    const items = slice.map((doc) => {
+      const data = doc.data() as Transaction & { id?: string; createdAt?: any };
+      if (!data.id) data.id = doc.id;
+      return data as Transaction;
+    });
+    const last = slice[slice.length - 1];
+    let nextCursor: string | undefined;
+    if (hasMore && last) {
+      interface FirestoreTsLike {
+        _seconds: number;
+        _nanoseconds?: number;
+      }
+      const lastData = last.data() as {
+        createdAt?: Date | FirestoreTsLike;
+      };
+      const createdAtVal = lastData.createdAt;
+      const isFsTs = (v: unknown): v is FirestoreTsLike =>
+        !!v &&
+        typeof v === 'object' &&
+        '_seconds' in (v as any) &&
+        typeof (v as Record<string, unknown>)['_seconds'] === 'number';
+      if (createdAtVal instanceof Date) {
+        nextCursor = String(createdAtVal.getTime());
+      } else if (isFsTs(createdAtVal)) {
+        nextCursor = String(createdAtVal._seconds * 1000);
+      }
+    }
+    return { items, nextCursor, hasMore };
   }
 
   // Admin: list all transactions (optionally limited) ordered by createdAt desc
@@ -68,7 +128,11 @@ export class TransactionsService {
       .orderBy('createdAt', 'desc')
       .limit(limit)
       .get();
-    return snapshot.docs.map((d) => d.data() as Transaction);
+    return snapshot.docs.map((doc) => {
+      const data = doc.data() as Transaction & { id?: string };
+      if (!data.id) data.id = doc.id; // ensure id present for legacy admin adjustments
+      return data as Transaction;
+    });
   }
 
   async update(id: string, dto: UpdateTransactionDto): Promise<Transaction> {

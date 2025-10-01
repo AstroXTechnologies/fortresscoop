@@ -129,7 +129,11 @@ export class WalletAdminController {
     });
 
     // record an admin adjustment transaction
-    const txRef = await firestore.collection('transactions').add({
+    const txCollection = firestore.collection('transactions');
+    const txRef = txCollection.doc();
+    const txId = txRef.id;
+    await txRef.set({
+      id: txId,
       userId,
       type: dto.type === 'credit' ? 'ADMIN_CREDIT' : 'ADMIN_DEBIT',
       amount: Math.abs(delta),
@@ -145,7 +149,7 @@ export class WalletAdminController {
       previousBalance: prev,
       newBalance: next,
       currency,
-      transactionId: txRef.id,
+      transactionId: txId,
     };
   }
 }

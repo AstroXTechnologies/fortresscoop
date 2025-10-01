@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CreateTransactionDto, UpdateTransactionDto } from './transaction.dto';
 
@@ -24,7 +32,16 @@ export class TransactionsController {
 
   @Get(':userId')
   @ApiOperation({ summary: 'Get all transactions for a user' })
-  findAllTransactions(@Param('userId') userId: string) {
+  findAllTransactions(
+    @Param('userId') userId: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+    @Query('paginated') paginated?: string,
+  ) {
+    if (paginated === 'true') {
+      const l = Number(limit);
+      return this.service.findAllPaginated(userId, !isNaN(l) ? l : 25, cursor);
+    }
     return this.service.findAll(userId);
   }
 
