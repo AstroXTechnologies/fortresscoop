@@ -27,4 +27,12 @@ export class DashboardController {
   async getAdminDashboard(): Promise<AdminDashboardDto> {
     return this.dashboardService.getAdminDashboard();
   }
+
+  // Alias route for frontend /admin/overview page (same data contract)
+  @ApAuthGuard(UserRole.ADMIN)
+  @Get('admin/overview')
+  @ApiOperation({ summary: 'Get admin overview (alias of admin dashboard)' })
+  async getAdminOverview(): Promise<AdminDashboardDto> {
+    return this.dashboardService.getAdminDashboard();
+  }
 }

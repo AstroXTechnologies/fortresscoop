@@ -90,4 +90,18 @@ export class AdminDashboardDto {
 
   @ApiProperty({ description: 'Top 5 active users by investments or savings' })
   topUsers: any[];
+
+  @ApiProperty({
+    description: 'Recent transactions (latest 10)',
+    required: false,
+    type: [Object],
+  })
+  recentTransactions?: any[];
+
+  @ApiProperty({
+    description: 'Monthly deposit vs withdrawal trends (last 6 months)',
+    required: false,
+    type: [Object],
+  })
+  monthlyTrends?: { month: string; deposits: number; withdrawals: number }[];
 }

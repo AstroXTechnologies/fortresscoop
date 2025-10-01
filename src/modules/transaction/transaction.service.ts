@@ -61,6 +61,16 @@ export class TransactionsService {
     return snapshot.docs.map((doc) => doc.data() as Transaction);
   }
 
+  // Admin: list all transactions (optionally limited) ordered by createdAt desc
+  async findAllAdmin(limit = 500): Promise<Transaction[]> {
+    const snapshot = await db
+      .collection(this.collection)
+      .orderBy('createdAt', 'desc')
+      .limit(limit)
+      .get();
+    return snapshot.docs.map((d) => d.data() as Transaction);
+  }
+
   async update(id: string, dto: UpdateTransactionDto): Promise<Transaction> {
     const ref = db.collection(this.collection).doc(id);
     const existing = await ref.get();

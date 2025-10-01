@@ -41,9 +41,9 @@ export class DashboardService {
       .orderBy('createdAt', 'desc')
       .limit(5);
     const txSnap = await txRef.get();
-    const recentTransactions = txSnap.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
+    const recentTransactions = txSnap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
     }));
 
     const now = new Date();
@@ -278,10 +278,111 @@ export class DashboardService {
       }
     });
 
-    const topUsers = Object.entries(userStats)
+    const rawTopUsers = Object.entries(userStats)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([userId, total]) => ({ userId, total }));
+      .slice(0, 5);
+
+    // Fetch user documents for top users to enrich with fullName
+    const topUserDocs = await Promise.all(
+      rawTopUsers.map(async ([userId, total]) => {
+        try {
+          const doc = await db.collection('users').doc(userId).get();
+          const data = doc.data() as { fullName?: string } | undefined;
+          return { userId, total, fullName: data?.fullName || userId };
+        } catch {
+          return { userId, total, fullName: userId };
+        }
+      }),
+    );
+
+    // Recent transactions (latest 10)
+    const txSnap = await db
+      .collection('transactions')
+      .orderBy('createdAt', 'desc')
+      .limit(10)
+      .get();
+    interface RecentTxRaw {
+      id: string;
+      userId?: string;
+      type?: string;
+      status?: string;
+      amount?: number;
+      createdAt?: any;
+      [k: string]: any;
+    }
+    const recentTransactionsRaw: RecentTxRaw[] = txSnap.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Record<string, unknown>),
+    }));
+    // Collect distinct userIds to batch fetch names
+    const recentUserIds = Array.from(
+      new Set(
+        recentTransactionsRaw
+          .map((t) => t.userId)
+          .filter((u): u is string => typeof u === 'string'),
+      ),
+    ).slice(0, 25); // limit safety
+    const userDocs = await Promise.all(
+      recentUserIds.map(async (uid) => {
+        try {
+          const doc = await db.collection('users').doc(uid).get();
+          const d = doc.data() as { fullName?: string } | undefined;
+          return { uid, fullName: d?.fullName || uid };
+        } catch {
+          return { uid, fullName: uid };
+        }
+      }),
+    );
+    const userNameMap = userDocs.reduce<Record<string, string>>((acc, u) => {
+      acc[u.uid] = u.fullName;
+      return acc;
+    }, {});
+    const recentTransactions = recentTransactionsRaw.map((t) => {
+      const userFullName = t.userId ? userNameMap[t.userId] || t.userId : '';
+      return { ...t, userFullName };
+    });
+
+    // Monthly trends (last 6 months) based on successful DEPOSIT/WITHDRAWAL
+    const trendSnap = await db
+      .collection('transactions')
+      .orderBy('createdAt', 'desc')
+      .limit(1000) // cap to avoid full scan
+      .get();
+    const trendMap: Record<string, { deposits: number; withdrawals: number }> =
+      {};
+    const now = new Date();
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - 5, 1); // approx last 6 months
+    trendSnap.docs.forEach((doc) => {
+      const data = doc.data() as {
+        createdAt?: { toDate?: () => Date } | Date | string;
+        type?: string;
+        status?: string;
+        amount?: number;
+      };
+      if (!data.createdAt) return;
+      let createdAt: Date;
+      if (data.createdAt instanceof Date) {
+        createdAt = data.createdAt;
+      } else if (typeof data.createdAt === 'string') {
+        createdAt = new Date(data.createdAt);
+      } else if (typeof data.createdAt === 'object' && data.createdAt.toDate) {
+        createdAt = data.createdAt.toDate();
+      } else {
+        return;
+      }
+      if (createdAt < cutoff) return;
+      if (data.status !== 'SUCCESS') return;
+      const key = createdAt.toLocaleString('default', { month: 'short' });
+      if (!trendMap[key]) trendMap[key] = { deposits: 0, withdrawals: 0 };
+      if (data.type === 'DEPOSIT')
+        trendMap[key].deposits += Number(data.amount || 0);
+      if (data.type === 'WITHDRAWAL')
+        trendMap[key].withdrawals += Number(data.amount || 0);
+    });
+    const monthlyTrends = Object.entries(trendMap).map(([month, v]) => ({
+      month,
+      ...v,
+    }));
 
     return {
       totalUsers,
@@ -289,7 +390,9 @@ export class DashboardService {
       totalSavings,
       totalInvestments,
       pendingWithdrawals,
-      topUsers,
+      topUsers: topUserDocs,
+      recentTransactions,
+      monthlyTrends,
     };
   }
 }

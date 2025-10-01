@@ -26,7 +26,15 @@ export class UserController {
 
   @ApAuthGuard(UserRole.ADMIN)
   @Get()
-  findAll() {
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'page', required: false })
+  findAll(@Query('limit') limit?: string, @Query('page') page?: string) {
+    if (limit || page) {
+      return this.userService.findAllPaginated(
+        Number(limit) || 25,
+        Number(page) || 1,
+      );
+    }
     return this.userService.findAll();
   }
 
@@ -58,5 +66,11 @@ export class UserController {
   @Delete(':id')
   removeUser(@Param('id') id: string) {
     return this.userService.remove(id);
+  }
+
+  @ApAuthGuard(UserRole.ADMIN)
+  @Get(':id/admin-summary')
+  getAdminUserSummary(@Param('id') id: string) {
+    return this.userService.getAdminUserSummary(id);
   }
 }
