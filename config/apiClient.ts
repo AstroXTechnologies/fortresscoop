@@ -3,7 +3,17 @@ import axios from 'axios';
 export class ApiClient {
   private readonly secretKey = process.env.FLW_SECRET_KEY;
 
-  constructor(private readonly baseUrl: string) {}
+  constructor(private readonly baseUrl: string) {
+    if (!baseUrl) {
+      throw new Error('ApiClient: baseUrl is required');
+    }
+    if (!this.secretKey) {
+      throw new Error(
+        'ApiClient: FLW_SECRET_KEY environment variable is required',
+      );
+    }
+    console.log('ApiClient initialized with baseUrl:', baseUrl);
+  }
 
   async get<T>(
     endpoint: string,

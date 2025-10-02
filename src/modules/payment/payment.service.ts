@@ -7,11 +7,35 @@ import { FlutterwaveTransactionResponse } from './payment.model';
 
 @Injectable()
 export class PaymentService {
-  private readonly baseUrl = process.env.FLW_ENDPOINT;
+  private readonly baseUrl: string;
   private readonly apiClient: ApiClient;
 
   constructor(private readonly transanctionsService: TransactionsService) {
-    this.apiClient = new ApiClient(this.baseUrl!);
+    // Try multiple potential environment variable names
+    this.baseUrl =
+      process.env.FLW_ENDPOINT ||
+      process.env.FLUTTERWAVE_ENDPOINT ||
+      process.env.FLUTTER_ENDPOINT ||
+      'https://api.flutterwave.com/v3'; // fallback to default
+
+    // Add validation and logging for debugging
+    console.log('Environment check:');
+    console.log('FLW_ENDPOINT:', process.env.FLW_ENDPOINT);
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log(
+      'All FLW env vars:',
+      Object.keys(process.env)
+        .filter((key) => key.includes('FLW'))
+        .reduce((obj, key) => ({ ...obj, [key]: process.env[key] }), {}),
+    );
+
+    if (!this.baseUrl || this.baseUrl === '') {
+      console.error('FLW_ENDPOINT environment variable is not set');
+      throw new Error('FLW_ENDPOINT environment variable is required');
+    }
+
+    console.log('Flutterwave endpoint initialized:', this.baseUrl);
+    this.apiClient = new ApiClient(this.baseUrl);
   }
 
   async initialize(data: PaymentInputDto) {
