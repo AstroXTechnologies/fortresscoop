@@ -61,6 +61,12 @@ export class SavingsController {
     return this.service.findAll();
   }
 
+  @Get('user/:userId')
+  @ApiOperation({ summary: 'Find user savings' })
+  findUserSavings(@Param('userId') userId: string) {
+    return this.service.findUserSavings(userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a savings record by ID' })
   findOneSavings(@Param('id') id: string) {
@@ -77,11 +83,5 @@ export class SavingsController {
   @ApiOperation({ summary: 'Close a savings record by ID' })
   removeSavings(@Param('id') id: string) {
     return this.service.remove(id);
-  }
-
-  @Get('user/:userId')
-  @ApiOperation({ summary: 'Find user savings' })
-  findUserSavings(@Param('userId') userId: string) {
-    return this.service.findUserSavings(userId);
   }
 }

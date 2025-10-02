@@ -159,10 +159,11 @@ export class SavingsService {
       if (
         v &&
         typeof v === 'object' &&
-        '_seconds' in (v as Record<string, unknown>) &&
+        Object.prototype.hasOwnProperty.call(v, '_seconds') &&
         typeof (v as { _seconds?: unknown })._seconds === 'number'
       ) {
-        return (v as { _seconds: number })._seconds * 1000;
+        const secs = (v as { _seconds: number })._seconds;
+        return typeof secs === 'number' ? secs * 1000 : NaN;
       }
       return NaN;
     };
@@ -206,6 +207,17 @@ export class SavingsService {
       }
     }
     return { data: enhanced, nextCursor };
+  }
+
+  /** Admin variant: same as paginatedFiltered but DOES NOT require userId */
+  async findAllAdminPaginated(params: {
+    status?: string;
+    minAmount?: number;
+    maxAmount?: number;
+    limit?: number;
+    cursor?: string;
+  }) {
+    return this.findAllPaginatedFiltered(params);
   }
 
   async findOne(id: string): Promise<Savings> {
@@ -281,10 +293,11 @@ export class SavingsService {
         if (
           v &&
           typeof v === 'object' &&
-          '_seconds' in v &&
+          Object.prototype.hasOwnProperty.call(v, '_seconds') &&
           typeof (v as { _seconds?: unknown })._seconds === 'number'
         ) {
-          return (v as { _seconds: number })._seconds * 1000;
+          const secs = (v as { _seconds: number })._seconds;
+          return typeof secs === 'number' ? secs * 1000 : NaN;
         }
         return NaN;
       };

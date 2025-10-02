@@ -99,11 +99,45 @@ export class WalletAdminController {
       acc[u.uid] = u.fullName;
       return acc;
     }, {});
+    interface FirestoreTsLike {
+      _seconds: number;
+      _nanoseconds?: number;
+    }
     return {
-      items: txs.map((t) => ({
-        ...t,
-        userFullName: nameMap[t.userId] || t.userId,
-      })),
+      items: txs.map((t) => {
+        const raw: unknown = (t as unknown as { createdAt?: unknown })
+          .createdAt;
+        let createdAt: string | null = null;
+        if (raw instanceof Date) {
+          createdAt = raw.toISOString();
+        } else if (typeof raw === 'string') {
+          const d = new Date(raw);
+          if (!isNaN(d.getTime())) createdAt = d.toISOString();
+        } else if (
+          raw &&
+          typeof raw === 'object' &&
+          '_seconds' in (raw as Record<string, unknown>) &&
+          typeof (raw as FirestoreTsLike)._seconds === 'number'
+        ) {
+          const ts = raw as FirestoreTsLike;
+          createdAt = new Date(ts._seconds * 1000).toISOString();
+        } else if (
+          raw &&
+          typeof raw === 'object' &&
+          'toDate' in (raw as Record<string, unknown>) &&
+          typeof (raw as { toDate?: unknown }).toDate === 'function'
+        ) {
+          const fn = (raw as { toDate: () => Date }).toDate;
+          const d = fn();
+          if (d instanceof Date && !isNaN(d.getTime()))
+            createdAt = d.toISOString();
+        }
+        return {
+          ...t,
+          createdAt,
+          userFullName: nameMap[t.userId] || t.userId,
+        };
+      }),
       nextCursor,
     };
   }
