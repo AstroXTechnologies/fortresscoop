@@ -145,27 +145,59 @@ export class TransactionsService {
     const items = snap.docs.map((doc) => {
       const data = doc.data() as Transaction & { id?: string };
       if (!data.id) data.id = doc.id;
+      // Ensure createdAt is in a safe format
+      if (
+        data.createdAt &&
+        typeof data.createdAt === 'object' &&
+        'toDate' in data.createdAt
+      ) {
+        try {
+          const toDateFn = (data.createdAt as { toDate: () => Date }).toDate;
+          data.createdAt = toDateFn();
+        } catch (error) {
+          console.warn(
+            'Failed to convert timestamp for transaction:',
+            doc.id,
+            error,
+          );
+          data.createdAt = new Date(); // fallback
+        }
+      }
       return data as Transaction;
     });
     const last = snap.docs[snap.docs.length - 1];
     let nextCursor: string | null = null;
     if (last) {
-      const raw = last.get('createdAt') as
-        | Date
-        | { toDate?: () => Date }
-        | undefined;
-      if (raw instanceof Date) {
-        nextCursor = String(raw.getTime());
-      } else if (
-        raw &&
-        typeof raw === 'object' &&
-        typeof (raw as { toDate?: () => Date }).toDate === 'function'
-      ) {
-        const toDateFn = (raw as { toDate: () => Date }).toDate;
-        const d = toDateFn();
-        if (d instanceof Date && !isNaN(d.getTime())) {
-          nextCursor = String(d.getTime());
+      try {
+        const raw = last.get('createdAt') as
+          | Date
+          | { toDate?: () => Date }
+          | { _seconds?: number }
+          | undefined;
+        if (raw instanceof Date) {
+          nextCursor = String(raw.getTime());
+        } else if (
+          raw &&
+          typeof raw === 'object' &&
+          typeof (raw as { toDate?: () => Date }).toDate === 'function'
+        ) {
+          const toDateFn = (raw as { toDate: () => Date }).toDate;
+          const d = toDateFn();
+          if (d instanceof Date && !isNaN(d.getTime())) {
+            nextCursor = String(d.getTime());
+          }
+        } else if (
+          raw &&
+          typeof raw === 'object' &&
+          '_seconds' in raw &&
+          typeof (raw as { _seconds?: number })._seconds === 'number'
+        ) {
+          const ts = raw as { _seconds: number };
+          nextCursor = String(ts._seconds * 1000);
         }
+      } catch (error) {
+        console.warn('Failed to parse createdAt for cursor:', error);
+        nextCursor = null;
       }
     }
     return { items, nextCursor };

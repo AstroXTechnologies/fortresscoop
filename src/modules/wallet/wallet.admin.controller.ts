@@ -36,12 +36,27 @@ export class WalletAdminController {
     let failedTransactionsCount = 0;
 
     for (const t of txs) {
-      if (t.status === 'PENDING') pendingTransactionsCount++;
-      if (t.status === 'FAILED') failedTransactionsCount++;
-      if (t.status === 'SUCCESS' && t.type === 'DEPOSIT')
-        totalDepositsAmount += Number(t.amount);
-      if (t.status === 'SUCCESS' && t.type === 'WITHDRAWAL')
-        totalWithdrawalsAmount += Number(t.amount);
+      try {
+        // narrow to a safe shape to avoid unsafe member access on possibly-unknown items
+        const tx = t as unknown as {
+          status?: string;
+          type?: string;
+          amount?: unknown;
+        };
+        const status = tx.status;
+        const type = tx.type;
+        const amountNum = Number(tx.amount ?? 0);
+
+        if (status === 'PENDING') pendingTransactionsCount++;
+        if (status === 'FAILED') failedTransactionsCount++;
+        if (status === 'SUCCESS' && type === 'DEPOSIT')
+          totalDepositsAmount += amountNum;
+        if (status === 'SUCCESS' && type === 'WITHDRAWAL')
+          totalWithdrawalsAmount += amountNum;
+      } catch (error) {
+        console.warn('Skipping malformed transaction in summary:', t, error);
+        continue;
+      }
     }
 
     return {
@@ -67,7 +82,7 @@ export class WalletAdminController {
     let parsed = Number(limit);
     if (!limit || isNaN(parsed) || parsed <= 0) parsed = 50;
     if (parsed > 500) parsed = 500;
-    const { items: txs, nextCursor } =
+    const { items: txs, nextCursor: rawNextCursor } =
       await this.transactionsService.findAllAdmin({
         limit: parsed,
         cursor,
@@ -76,11 +91,19 @@ export class WalletAdminController {
         userId,
         walletId,
       });
+    const nextCursor =
+      typeof rawNextCursor === 'string' ? rawNextCursor : undefined;
     // Enrich with user full names (batch fetch)
     const userIds = Array.from(
       new Set(
-        txs
-          .map((t) => t.userId)
+        (Array.isArray(txs) ? txs : [])
+          .map((t: unknown) => {
+            if (t && typeof t === 'object' && 'userId' in t) {
+              const uid = (t as Record<string, unknown>)['userId'];
+              return typeof uid === 'string' ? uid : undefined;
+            }
+            return undefined;
+          })
           .filter((u): u is string => typeof u === 'string'),
       ),
     ).slice(0, 500);
@@ -104,40 +127,80 @@ export class WalletAdminController {
       _nanoseconds?: number;
     }
     return {
-      items: txs.map((t) => {
-        const raw: unknown = (t as unknown as { createdAt?: unknown })
-          .createdAt;
-        let createdAt: string | null = null;
-        if (raw instanceof Date) {
-          createdAt = raw.toISOString();
-        } else if (typeof raw === 'string') {
-          const d = new Date(raw);
-          if (!isNaN(d.getTime())) createdAt = d.toISOString();
-        } else if (
-          raw &&
-          typeof raw === 'object' &&
-          '_seconds' in (raw as Record<string, unknown>) &&
-          typeof (raw as FirestoreTsLike)._seconds === 'number'
-        ) {
-          const ts = raw as FirestoreTsLike;
-          createdAt = new Date(ts._seconds * 1000).toISOString();
-        } else if (
-          raw &&
-          typeof raw === 'object' &&
-          'toDate' in (raw as Record<string, unknown>) &&
-          typeof (raw as { toDate?: unknown }).toDate === 'function'
-        ) {
-          const fn = (raw as { toDate: () => Date }).toDate;
-          const d = fn();
-          if (d instanceof Date && !isNaN(d.getTime()))
-            createdAt = d.toISOString();
-        }
-        return {
-          ...t,
-          createdAt,
-          userFullName: nameMap[t.userId] || t.userId,
+      items: (() => {
+        type TransactionLike = {
+          [key: string]: unknown;
+          userId?: string;
+          createdAt?: unknown;
+          id?: string;
+          type?: string;
+          amount?: unknown;
+          status?: string;
+          currency?: string;
         };
-      }),
+        type AdminTxView = {
+          id?: string;
+          userId?: string;
+          type?: string;
+          amount?: unknown;
+          status?: string;
+          currency?: string;
+          createdAt: string | null;
+          userFullName: string;
+        };
+
+        const safeTxs = Array.isArray(txs)
+          ? (txs as unknown as TransactionLike[])
+          : [];
+        const items: AdminTxView[] = safeTxs.map((t) => {
+          const raw = t.createdAt;
+          let createdAt: string | null = null;
+          try {
+            if (raw instanceof Date) {
+              createdAt = raw.toISOString();
+            } else if (typeof raw === 'string') {
+              const d = new Date(raw);
+              if (!isNaN(d.getTime())) createdAt = d.toISOString();
+            } else if (
+              raw &&
+              typeof raw === 'object' &&
+              '_seconds' in (raw as Record<string, unknown>) &&
+              typeof (raw as unknown as FirestoreTsLike)._seconds === 'number'
+            ) {
+              const ts = raw as FirestoreTsLike;
+              createdAt = new Date(ts._seconds * 1000).toISOString();
+            } else if (
+              raw &&
+              typeof raw === 'object' &&
+              'toDate' in (raw as Record<string, unknown>) &&
+              typeof (raw as { toDate?: unknown }).toDate === 'function'
+            ) {
+              const fn = (raw as { toDate: () => Date }).toDate;
+              const d = fn();
+              if (d instanceof Date && !isNaN(d.getTime()))
+                createdAt = d.toISOString();
+            }
+          } catch (error) {
+            // Log the error for debugging but don't crash
+            console.warn('Failed to parse createdAt timestamp:', raw, error);
+            createdAt = null;
+          }
+
+          const uid =
+            typeof t.userId === 'string' ? t.userId : String(t.userId ?? '');
+          return {
+            id: typeof t.id === 'string' ? t.id : undefined,
+            userId: typeof t.userId === 'string' ? t.userId : undefined,
+            type: typeof t.type === 'string' ? t.type : undefined,
+            amount: t.amount,
+            status: typeof t.status === 'string' ? t.status : undefined,
+            currency: typeof t.currency === 'string' ? t.currency : undefined,
+            createdAt,
+            userFullName: uid ? (nameMap[uid] ?? uid) : '',
+          };
+        });
+        return items;
+      })(),
       nextCursor,
     };
   }
