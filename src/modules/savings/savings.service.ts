@@ -122,6 +122,92 @@ export class SavingsService {
     return snapshot.docs.map((doc) => doc.data() as Savings);
   }
 
+  async findAllPaginatedFiltered(params: {
+    userId?: string;
+    minAmount?: number;
+    maxAmount?: number;
+    status?: string;
+    limit?: number;
+    cursor?: string; // createdAt ISO
+  }): Promise<{
+    data: (Savings & { progress?: number; remainingDays?: number })[];
+    nextCursor: string | null;
+  }> {
+    const { userId, minAmount, maxAmount, status, limit = 25, cursor } = params;
+    let q: FirebaseFirestore.Query = db.collection(this.collection);
+    if (userId) q = q.where('userId', '==', userId);
+    if (status) q = q.where('status', '==', status);
+    // Firestore can't handle compound inequality easily with multiple fields; apply amount filtering client-side after fetch if needed.
+    q = q.orderBy('createdAt', 'desc');
+    if (cursor) {
+      const cDate = new Date(cursor);
+      if (!isNaN(cDate.getTime())) q = q.startAfter(cDate);
+    }
+    const snap = await q.limit(Math.min(limit, 100)).get();
+    let data = snap.docs.map((d) => d.data() as Savings);
+    if (minAmount !== undefined)
+      data = data.filter((s) => (s.balance ?? 0) >= minAmount);
+    if (maxAmount !== undefined)
+      data = data.filter((s) => (s.balance ?? 0) <= maxAmount);
+
+    // Compute progress / remainingDays similar to findUserSavings helper
+    const now = Date.now();
+    const toMs = (v: unknown): number => {
+      if (v instanceof Date) return v.getTime();
+      if (typeof v === 'string' || typeof v === 'number')
+        return new Date(v).getTime();
+      if (
+        v &&
+        typeof v === 'object' &&
+        '_seconds' in (v as Record<string, unknown>) &&
+        typeof (v as { _seconds?: unknown })._seconds === 'number'
+      ) {
+        return (v as { _seconds: number })._seconds * 1000;
+      }
+      return NaN;
+    };
+    const enhance = (
+      s: Savings,
+    ): Savings & { progress: number; remainingDays: number } => {
+      const startMs = toMs((s as unknown as { startDate?: unknown }).startDate);
+      const maturityMs = toMs(
+        (s as unknown as { maturityDate?: unknown }).maturityDate,
+      );
+      let progress = 0;
+      if (!isNaN(startMs) && !isNaN(maturityMs) && startMs < maturityMs) {
+        progress = Math.min(
+          100,
+          Math.max(0, ((now - startMs) / (maturityMs - startMs)) * 100),
+        );
+      }
+      const remainingDays = !isNaN(maturityMs)
+        ? Math.max(0, Math.ceil((maturityMs - now) / 86400000))
+        : 0;
+      return { ...s, progress, remainingDays };
+    };
+    const enhanced = data.map(enhance);
+    const last = snap.docs[snap.docs.length - 1];
+    let nextCursor: string | null = null;
+    if (last) {
+      const createdAtVal: unknown = last.get('createdAt');
+      if (createdAtVal instanceof Date) nextCursor = createdAtVal.toISOString();
+      else if (
+        createdAtVal &&
+        typeof createdAtVal === 'object' &&
+        'toDate' in (createdAtVal as Record<string, unknown>)
+      ) {
+        try {
+          nextCursor = (createdAtVal as { toDate: () => Date })
+            .toDate()
+            .toISOString();
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return { data: enhanced, nextCursor };
+  }
+
   async findOne(id: string): Promise<Savings> {
     const doc = await db.collection(this.collection).doc(id).get();
     if (!doc.exists)

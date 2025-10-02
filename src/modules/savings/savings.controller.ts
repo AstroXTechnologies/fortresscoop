@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
@@ -35,8 +36,28 @@ export class SavingsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all savings records' })
-  findAllSavings() {
+  @ApiOperation({
+    summary: 'Get savings records (optionally paginated & filtered)',
+  })
+  findAllSavings(
+    @Query('paginated') paginated?: string,
+    @Query('userId') userId?: string,
+    @Query('status') status?: string,
+    @Query('minAmount') minAmount?: string,
+    @Query('maxAmount') maxAmount?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    if (paginated === 'true') {
+      return this.service.findAllPaginatedFiltered({
+        userId,
+        status,
+        minAmount: minAmount ? parseFloat(minAmount) : undefined,
+        maxAmount: maxAmount ? parseFloat(maxAmount) : undefined,
+        limit: limit ? parseInt(limit, 10) : undefined,
+        cursor: cursor || undefined,
+      });
+    }
     return this.service.findAll();
   }
 

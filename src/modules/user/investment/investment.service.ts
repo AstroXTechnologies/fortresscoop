@@ -107,6 +107,54 @@ export class UserInvestmentsService {
     return snapshot.docs.map((doc) => doc.data() as UserInvestment);
   }
 
+  async findAllPaginatedFiltered(params: {
+    userId?: string;
+    status?: string;
+    productId?: string;
+    limit?: number;
+    cursor?: string; // ISO createdAt string cursor
+  }): Promise<{ data: UserInvestment[]; nextCursor: string | null }> {
+    const { userId, status, productId, limit = 25, cursor } = params;
+    let q: FirebaseFirestore.Query = db.collection(this.collection);
+    if (userId) q = q.where('userId', '==', userId);
+    if (status) q = q.where('status', '==', status);
+    if (productId) q = q.where('productId', '==', productId);
+    q = q.orderBy('createdAt', 'desc');
+
+    if (cursor) {
+      // Fetch a doc with createdAt equal to cursor (or startAfter timestamp)
+      const cursorDate = new Date(cursor);
+      if (!isNaN(cursorDate.getTime())) {
+        q = q.startAfter(cursorDate);
+      }
+    }
+
+    const snap = await q.limit(Math.min(limit, 100)).get();
+    const data = snap.docs.map((d) => d.data() as UserInvestment);
+    const last = snap.docs[snap.docs.length - 1];
+    let nextCursor: string | null = null;
+    if (last) {
+      const createdAtVal: unknown = last.get('createdAt');
+      if (createdAtVal instanceof Date) {
+        nextCursor = createdAtVal.toISOString();
+      } else if (
+        createdAtVal &&
+        typeof createdAtVal === 'object' &&
+        'toDate' in createdAtVal &&
+        typeof (createdAtVal as { toDate: () => Date }).toDate === 'function'
+      ) {
+        try {
+          nextCursor = (createdAtVal as { toDate: () => Date })
+            .toDate()
+            .toISOString();
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+    return { data, nextCursor };
+  }
+
   async findOne(id: string): Promise<UserInvestment> {
     const doc = await db.collection(this.collection).doc(id).get();
     if (!doc.exists)
@@ -129,7 +177,7 @@ export class UserInvestmentsService {
       updatedAt: new Date(),
     } as UserInvestment;
 
-    await docRef.update(updated as any);
+    await docRef.update(updated as unknown as Record<string, unknown>);
     return updated;
   }
 

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
@@ -32,9 +33,28 @@ export class UserInvestmentsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all user investments' })
-  findAllUserInvestments() {
-    return this.service.findAll();
+  @ApiOperation({
+    summary:
+      'Get user investments (always filtered by userId; supports pagination)',
+  })
+  findAllUserInvestments(
+    @Query('userId') userId?: string,
+    @Query('status') status?: string,
+    @Query('productId') productId?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    // Enforce user scoping: never return all users' investments
+    if (!userId) {
+      return { data: [], nextCursor: null };
+    }
+    return this.service.findAllPaginatedFiltered({
+      userId,
+      status,
+      productId,
+      limit: limit ? Number(limit) : 25,
+      cursor,
+    });
   }
 
   @Get(':id')

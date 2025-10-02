@@ -27,7 +27,7 @@ export class UserController {
     return this.userService.create(createUserDto);
   }
 
-  @ApAuthGuard(UserRole.USER)
+  @ApAuthGuard(UserRole.USER, UserRole.ADMIN)
   @Get()
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'page', required: false })
@@ -41,7 +41,7 @@ export class UserController {
     return this.userService.findAll();
   }
 
-  @ApAuthGuard(UserRole.USER)
+  @ApAuthGuard(UserRole.USER, UserRole.ADMIN)
   @ApiQuery({
     name: 'email',
     required: false,
@@ -76,7 +76,7 @@ export class UserController {
   }
 
   // user self-update (profile & settings)
-  @ApAuthGuard(UserRole.USER)
+  @ApAuthGuard(UserRole.USER, UserRole.ADMIN)
   @Patch('profile/:id')
   updateOwn(@Param('id') id: string, @Body() body: UpdateUserDto) {
     return this.userService.update(id, body);
