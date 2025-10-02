@@ -27,7 +27,9 @@ export class WalletAdminController {
     summary: 'Get aggregated wallet & transaction metrics for admin dashboard',
   })
   async getSummary(): Promise<WalletAdminSummaryDto> {
-    const txs = await this.transactionsService.findAllAdmin();
+    const { items: txs } = await this.transactionsService.findAllAdmin({
+      limit: 500,
+    });
     let totalDepositsAmount = 0;
     let totalWithdrawalsAmount = 0;
     let pendingTransactionsCount = 0;
@@ -54,11 +56,26 @@ export class WalletAdminController {
   @ApiOperation({
     summary: 'List recent transactions across all users (admin)',
   })
-  async getRecentTransactions(@Query('limit') limit?: string) {
+  async getRecentTransactions(
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('userId') userId?: string,
+    @Query('walletId') walletId?: string,
+  ) {
     let parsed = Number(limit);
-    if (!limit || isNaN(parsed) || parsed <= 0) parsed = 200;
-    if (parsed > 1000) parsed = 1000;
-    const txs = await this.transactionsService.findAllAdmin(parsed);
+    if (!limit || isNaN(parsed) || parsed <= 0) parsed = 50;
+    if (parsed > 500) parsed = 500;
+    const { items: txs, nextCursor } =
+      await this.transactionsService.findAllAdmin({
+        limit: parsed,
+        cursor,
+        type,
+        status,
+        userId,
+        walletId,
+      });
     // Enrich with user full names (batch fetch)
     const userIds = Array.from(
       new Set(
@@ -82,10 +99,13 @@ export class WalletAdminController {
       acc[u.uid] = u.fullName;
       return acc;
     }, {});
-    return txs.map((t) => ({
-      ...t,
-      userFullName: nameMap[t.userId] || t.userId,
-    }));
+    return {
+      items: txs.map((t) => ({
+        ...t,
+        userFullName: nameMap[t.userId] || t.userId,
+      })),
+      nextCursor,
+    };
   }
 
   @Post('adjust')

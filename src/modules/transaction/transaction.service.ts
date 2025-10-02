@@ -122,17 +122,53 @@ export class TransactionsService {
   }
 
   // Admin: list all transactions (optionally limited) ordered by createdAt desc
-  async findAllAdmin(limit = 500): Promise<Transaction[]> {
-    const snapshot = await db
-      .collection(this.collection)
-      .orderBy('createdAt', 'desc')
-      .limit(limit)
-      .get();
-    return snapshot.docs.map((doc) => {
+  async findAllAdmin(params: {
+    limit?: number;
+    cursor?: string; // millis
+    type?: string;
+    status?: string;
+    userId?: string;
+    walletId?: string;
+  }): Promise<{ items: Transaction[]; nextCursor: string | null }> {
+    const { limit = 50, cursor, type, status, userId, walletId } = params;
+    let q: FirebaseFirestore.Query = db.collection(this.collection);
+    if (type) q = q.where('type', '==', type);
+    if (status) q = q.where('status', '==', status);
+    if (userId) q = q.where('userId', '==', userId);
+    if (walletId) q = q.where('walletId', '==', walletId);
+    q = q.orderBy('createdAt', 'desc');
+    if (cursor) {
+      const d = new Date(Number(cursor));
+      if (!isNaN(d.getTime())) q = q.startAfter(d);
+    }
+    const snap = await q.limit(Math.min(limit, 200)).get();
+    const items = snap.docs.map((doc) => {
       const data = doc.data() as Transaction & { id?: string };
-      if (!data.id) data.id = doc.id; // ensure id present for legacy admin adjustments
+      if (!data.id) data.id = doc.id;
       return data as Transaction;
     });
+    const last = snap.docs[snap.docs.length - 1];
+    let nextCursor: string | null = null;
+    if (last) {
+      const raw = last.get('createdAt') as
+        | Date
+        | { toDate?: () => Date }
+        | undefined;
+      if (raw instanceof Date) {
+        nextCursor = String(raw.getTime());
+      } else if (
+        raw &&
+        typeof raw === 'object' &&
+        typeof (raw as { toDate?: () => Date }).toDate === 'function'
+      ) {
+        const toDateFn = (raw as { toDate: () => Date }).toDate;
+        const d = toDateFn();
+        if (d instanceof Date && !isNaN(d.getTime())) {
+          nextCursor = String(d.getTime());
+        }
+      }
+    }
+    return { items, nextCursor };
   }
 
   async update(id: string, dto: UpdateTransactionDto): Promise<Transaction> {

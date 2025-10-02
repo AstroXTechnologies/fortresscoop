@@ -239,19 +239,36 @@ export class DashboardService {
       return sum + (data.balance || 0);
     }, 0);
 
+    // Savings: sum current locked principal (balance) for active & completed (exclude closed / cancelled if any)
     const savingsSnap = await db.collection('savings').get();
-
     const totalSavings = savingsSnap.docs.reduce((sum, doc) => {
-      const data = doc.data() as { amount?: number };
-      return sum + (data?.amount ?? 0);
+      const data = doc.data() as { balance?: number; status?: string };
+      const status = (data.status || '').toUpperCase();
+      if (['ACTIVE', 'COMPLETED'].includes(status)) {
+        return sum + Number(data.balance || 0);
+      }
+      return sum;
     }, 0);
 
+    // Investments can exist in two collections (legacy 'investments' and current 'userInvestments'). Sum both ACTIVE/MATURED/COMPLETED, exclude CANCELLED.
     const investmentsSnap = await db.collection('investments').get();
-
-    const totalInvestments = investmentsSnap.docs.reduce((sum, doc) => {
-      const data = doc.data() as { amount?: number };
-      return sum + (data.amount || 0);
+    const userInvestmentsSnap = await db.collection('userInvestments').get();
+    const validInvestmentStatus = new Set(['ACTIVE', 'MATURED', 'COMPLETED']);
+    const legacyTotal = investmentsSnap.docs.reduce((sum, doc) => {
+      const data = doc.data() as { amount?: number; status?: string };
+      if (validInvestmentStatus.has((data.status || '').toUpperCase())) {
+        return sum + Number(data.amount || 0);
+      }
+      return sum;
     }, 0);
+    const userInvTotal = userInvestmentsSnap.docs.reduce((sum, doc) => {
+      const data = doc.data() as { amount?: number; status?: string };
+      if (validInvestmentStatus.has((data.status || '').toUpperCase())) {
+        return sum + Number(data.amount || 0);
+      }
+      return sum;
+    }, 0);
+    const totalInvestments = legacyTotal + userInvTotal;
 
     const withdrawalsSnap = await db
       .collection('withdrawals')
@@ -263,20 +280,40 @@ export class DashboardService {
     const userStats: Record<string, number> = {};
 
     savingsSnap.docs.forEach((doc) => {
-      const data = doc.data() as { userId?: string; amount?: number };
+      const data = doc.data() as {
+        userId?: string;
+        balance?: number;
+        status?: string;
+      };
       const userId = typeof data.userId === 'string' ? data.userId : '';
-      if (userId) {
-        userStats[userId] = (userStats[userId] || 0) + (data.amount || 0);
+      if (
+        userId &&
+        ['ACTIVE', 'COMPLETED'].includes((data.status || '').toUpperCase())
+      ) {
+        userStats[userId] =
+          (userStats[userId] || 0) + Number(data.balance || 0);
       }
     });
-
-    investmentsSnap.docs.forEach((doc) => {
-      const data = doc.data() as { userId?: string; amount?: number };
-      const userId = typeof data.userId === 'string' ? data.userId : '';
-      if (userId) {
-        userStats[userId] = (userStats[userId] || 0) + (data.amount || 0);
-      }
-    });
+    // Include both legacy and userInvestments collection in top users aggregate
+    const addInvToStats = (docs: FirebaseFirestore.QueryDocumentSnapshot[]) => {
+      docs.forEach((doc) => {
+        const data = doc.data() as {
+          userId?: string;
+          amount?: number;
+          status?: string;
+        };
+        const userId = typeof data.userId === 'string' ? data.userId : '';
+        if (
+          userId &&
+          validInvestmentStatus.has((data.status || '').toUpperCase())
+        ) {
+          userStats[userId] =
+            (userStats[userId] || 0) + Number(data.amount || 0);
+        }
+      });
+    };
+    addInvToStats(investmentsSnap.docs);
+    addInvToStats(userInvestmentsSnap.docs);
 
     const rawTopUsers = Object.entries(userStats)
       .sort((a, b) => b[1] - a[1])
