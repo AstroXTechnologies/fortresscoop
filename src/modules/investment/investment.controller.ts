@@ -2,7 +2,11 @@ import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApAuthGuard } from 'src/modules/auth/auth-guard.decorator';
 import { UserRole } from 'src/modules/user/user.model';
-import { CreateInvestmentDto, UpdateInvestmentDto } from './investment.dto';
+import {
+  CreateInvestmentDto,
+  PreviewInvestmentDto,
+  UpdateInvestmentDto,
+} from './investment.dto';
 import { InvestmentsService } from './investment.service';
 
 @ApAuthGuard(UserRole.USER)
@@ -31,5 +35,11 @@ export class InvestmentsController {
   @ApiOperation({ summary: 'Update an investment status' })
   updateInvestment(@Param('id') id: string, @Body() dto: UpdateInvestmentDto) {
     return this.service.update(id, dto);
+  }
+
+  @Post('preview')
+  @ApiOperation({ summary: 'Preview an investment for a product' })
+  previewInvestment(@Body() dto: PreviewInvestmentDto) {
+    return this.service.preview(dto.amount, dto.productId);
   }
 }

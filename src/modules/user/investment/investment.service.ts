@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { db } from 'src/main';
+import { ConfigService } from 'src/modules/config/config.service';
 import { InvestmentProduct } from 'src/modules/investment/product/product.model';
 import {
   CreateUserInvestmentDto,
@@ -18,8 +19,26 @@ export class UserInvestmentsService {
   private walletCollection = 'wallets';
   private transactionCollection = 'transactions';
 
+  constructor(private readonly configService: ConfigService) {}
+
   async create(dto: CreateUserInvestmentDto): Promise<UserInvestment> {
     const { userId, productId, amount } = dto;
+
+    // Enforce allowed investment products if admin configured list is non-empty
+    try {
+      const cfg = await this.configService.getAllowedTypes();
+      if (
+        Array.isArray(cfg.allowedInvestmentProductIds) &&
+        cfg.allowedInvestmentProductIds.length > 0 &&
+        !cfg.allowedInvestmentProductIds.includes(productId)
+      ) {
+        throw new BadRequestException(
+          'Selected investment product is not allowed',
+        );
+      }
+    } catch {
+      // fail-open: if config read fails, allow (but consider logging)
+    }
 
     // Fetch product
     const productDoc = await db

@@ -5,6 +5,14 @@ import { Wallet } from 'src/modules/wallet/wallet.model';
 import { CreateInvestmentDto, UpdateInvestmentDto } from './investment.dto';
 import { Investment } from './investment.model';
 
+export interface PreviewInvestment {
+  principal: number;
+  interestRate: number;
+  durationInDays: number;
+  expectedReturns: number;
+  maturityDate: Date;
+}
+
 @Injectable()
 export class InvestmentsService {
   private collection = 'investments';
@@ -71,6 +79,36 @@ export class InvestmentsService {
     await ref.update({ status: dto.status });
     const updated = await ref.get();
     return updated.data() as Investment;
+  }
+
+  /**
+   * Compute a preview for an investment given an amount and productId.
+   * Uses the product's interestRate and durationInDays stored in DB.
+   */
+  async preview(amount: number, productId: string): Promise<PreviewInvestment> {
+    if (!amount || amount <= 0) throw new BadRequestException('Invalid amount');
+
+    const productRef = db.collection(this.productCollection).doc(productId);
+    const productSnap = await productRef.get();
+    if (!productSnap.exists) throw new BadRequestException('Product not found');
+    const product = productSnap.data() as InvestmentProduct;
+
+    const expectedReturns = parseFloat(
+      (amount * (product.interestRate / 100)).toFixed(2),
+    );
+
+    const now = new Date();
+    const maturityDate = new Date(
+      now.getTime() + product.durationInDays * 24 * 60 * 60 * 1000,
+    );
+
+    return {
+      principal: amount,
+      interestRate: product.interestRate,
+      durationInDays: product.durationInDays,
+      expectedReturns,
+      maturityDate,
+    };
   }
 
   // Called by cron job or scheduler

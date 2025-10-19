@@ -1,9 +1,7 @@
-import { SavingPlanType } from './savings.dto';
-
 export class Savings {
   id: string;
   userId: string;
-  planType: SavingPlanType;
+  planType: string;
   interestRate: number;
   expectedInterest: number;
   balance: number;

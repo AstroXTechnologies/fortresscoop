@@ -18,3 +18,11 @@ export class UpdateInvestmentDto {
   })
   status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 }
+
+export class PreviewInvestmentDto {
+  @ApiProperty({ description: 'Amount to invest', example: 2000 })
+  amount: number;
+
+  @ApiProperty({ description: 'Investment product ID', example: 'prod_123' })
+  productId: string;
+}

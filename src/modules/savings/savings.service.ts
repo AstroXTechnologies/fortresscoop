@@ -4,11 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { db } from 'src/main';
-import {
-  CreateSavingDto,
-  SavingPlanType,
-  UpdateSavingDto,
-} from './savings.dto';
+import { ConfigService } from 'src/modules/config/config.service';
+import { CreateSavingDto, UpdateSavingDto } from './savings.dto';
 import { PreviewSaving, Savings } from './savings.model';
 
 @Injectable()
@@ -41,8 +38,45 @@ export class SavingsService {
     };
   }
 
+  constructor(private readonly configService: ConfigService) {}
+
   async create(dto: CreateSavingDto): Promise<Savings> {
-    const { userId, amount, durationInDays } = dto;
+    const { userId, amount, durationInDays, savingProductId } = dto;
+
+    // Fetch saving product created by admin and validate
+    let productSnap: FirebaseFirestore.DocumentSnapshot;
+    try {
+      productSnap = await db
+        .collection('savingProducts')
+        .doc(savingProductId)
+        .get();
+      if (!productSnap.exists)
+        throw new NotFoundException('Saving product not found');
+    } catch {
+      throw new BadRequestException('Invalid saving product selected');
+    }
+
+    const productData = productSnap.data() as {
+      id: string;
+      name: string;
+      minAmount: number;
+      maxAmount?: number;
+      durationInDays?: number;
+      interestRate?: number;
+    };
+
+    if (amount < productData.minAmount) {
+      throw new BadRequestException('Amount is below product minimum');
+    }
+    if (productData.maxAmount && amount > productData.maxAmount) {
+      throw new BadRequestException('Amount exceeds product maximum');
+    }
+
+    // use product values if provided, otherwise fall back to durations map
+    const actualDuration = productData.durationInDays ?? durationInDays;
+    const actualRate =
+      productData.interestRate ?? this.ratesMap[actualDuration];
+    if (!actualRate) throw new BadRequestException('Invalid duration selected');
 
     const walletQuery = await db
       .collection(this.walletCollection)
@@ -63,9 +97,9 @@ export class SavingsService {
     const maturityDate = new Date(now);
     maturityDate.setDate(now.getDate() + durationInDays);
 
-    const { interestRate, expectedInterest } = this.calculateInterest(
-      amount,
-      durationInDays,
+    const interestRate = actualRate;
+    const expectedInterest = parseFloat(
+      ((amount * interestRate * actualDuration) / (100 * 365)).toFixed(2),
     );
 
     await db.runTransaction(async (t) => {
@@ -85,9 +119,10 @@ export class SavingsService {
       const saving: Savings = {
         id: savingRef.id,
         userId,
-        planType: SavingPlanType.FIXED,
+        // keep legacy planType for compatibility but store product id in planType
+        planType: productData.name || productData.id,
         balance: amount,
-        durationInDays,
+        durationInDays: actualDuration,
         interestRate,
         expectedInterest,
         startDate: now,
@@ -227,20 +262,67 @@ export class SavingsService {
     return doc.data() as Savings;
   }
 
-  preview(amount: number, durationInDays: number): PreviewSaving {
+  /**
+   * Preview either by duration or by savingProductId. If savingProductId is provided,
+   * load the product and use its configured duration/interestRate where available.
+   */
+  async preview(
+    amount: number,
+    durationInDays?: number,
+    savingProductId?: string,
+  ): Promise<PreviewSaving> {
     const now = new Date();
-    const maturityDate = new Date(now);
-    maturityDate.setDate(now.getDate() + durationInDays);
 
-    const { interestRate, expectedInterest } = this.calculateInterest(
-      amount,
-      durationInDays,
-    );
+    // If a product id is provided, try to load it and derive rate/duration
+    let useDuration = durationInDays;
+    let useRate: number | undefined = undefined;
+    if (savingProductId) {
+      try {
+        const prodSnap = await db
+          .collection('savingProducts')
+          .doc(savingProductId)
+          .get();
+        if (!prodSnap.exists)
+          throw new NotFoundException('Saving product not found');
+        const prod = prodSnap.data() as {
+          id?: string;
+          name?: string;
+          durationInDays?: number;
+          interestRate?: number;
+        };
+        if (prod.durationInDays) useDuration = prod.durationInDays;
+        if (prod.interestRate) useRate = prod.interestRate;
+      } catch {
+        // If product lookup fails, fall back to the provided duration and map-based rate
+        // but surface a bad request only if both are missing.
+      }
+    }
+
+    if (!useDuration) {
+      throw new BadRequestException(
+        'Duration must be provided or available on the saving product',
+      );
+    }
+
+    const maturityDate = new Date(now);
+    maturityDate.setDate(now.getDate() + useDuration);
+
+    let interestRate = useRate;
+    let expectedInterest = 0;
+    if (interestRate === undefined) {
+      const res = this.calculateInterest(amount, useDuration);
+      interestRate = res.interestRate;
+      expectedInterest = res.expectedInterest;
+    } else {
+      expectedInterest = parseFloat(
+        ((amount * interestRate * useDuration) / (100 * 365)).toFixed(2),
+      );
+    }
 
     return {
       principal: amount,
-      interestRate,
-      duration: durationInDays,
+      interestRate: interestRate,
+      duration: useDuration,
       expectedInterest,
       maturityDate,
     };

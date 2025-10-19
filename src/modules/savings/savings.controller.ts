@@ -32,7 +32,11 @@ export class SavingsController {
   @Post('preview')
   @ApiOperation({ summary: 'Preview savings plan before creating' })
   previewSavings(@Body() dto: PreviewSavingDto) {
-    return this.service.preview(dto.amount, dto.durationInDays);
+    return this.service.preview(
+      dto.amount,
+      dto.durationInDays,
+      dto.savingProductId,
+    );
   }
 
   @Get()
